@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REFERENCE="$ROOT_DIR/docs/api-reference.md"
+
+"$ROOT_DIR/scripts/generate-docs" --check
+"$ROOT_DIR/scripts/generate-llms" --check
+
+while IFS= read -r function_name; do
+  case "$function_name" in uniopt__*) continue ;; esac
+  grep -Fq "\`$function_name" "$REFERENCE" || {
+    printf 'Public function missing from API reference: %s\n' "$function_name" >&2
+    exit 1
+  }
+done < <(sed -n 's/^\(uniopt_[a-zA-Z0-9_]*\)().*/\1/p' "$ROOT_DIR/lib/uniopt.sh" | sort -u)
+
+while IFS= read -r attribute; do
+  grep -Fq "\`$attribute\`" "$REFERENCE" || {
+    printf 'Declaration attribute missing from API reference: %s\n' "$attribute" >&2
+    exit 1
+  }
+done < <(sed -n 's/^[[:space:]]*\(--[a-z][a-z-]*\)).*/\1/p' "$ROOT_DIR/lib/uniopt.sh" | sort -u)
+
+for constraint in mutex one-of requires conflicts; do
+  grep -Fq "\`$constraint\`" "$REFERENCE" || {
+    printf 'Constraint missing from API reference: %s\n' "$constraint" >&2
+    exit 1
+  }
+done
+
+printf 'Documentation and public API reference are synchronized\n'

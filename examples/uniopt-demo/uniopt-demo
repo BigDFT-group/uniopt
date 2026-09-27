@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+if [[ -r "$ROOT_DIR/lib/uniopt.sh" && -r "$SCRIPT_DIR/schema.sh" ]]; then
+  UNIOPT_DEMO_LIBRARY="$ROOT_DIR/lib/uniopt.sh"
+  UNIOPT_DEMO_SCHEMA="$SCRIPT_DIR/schema.sh"
+elif [[ -r "$SCRIPT_DIR/../share/uniopt-demo/lib/uniopt.sh" ]]; then
+  UNIOPT_DEMO_LIBRARY="$SCRIPT_DIR/../share/uniopt-demo/lib/uniopt.sh"
+  UNIOPT_DEMO_SCHEMA="$SCRIPT_DIR/../share/uniopt-demo/schema.sh"
+else
+  printf 'uniopt-demo: cannot find its UniOpt library and schema\n' >&2
+  exit 2
+fi
+source "$UNIOPT_DEMO_LIBRARY"
+source "$UNIOPT_DEMO_SCHEMA"
+
+uniopt_demo_schema
+
+uniopt_parse "$@" || exit 2
+if [[ "$UNIOPT_ACTION" == help ]]; then uniopt_help; exit 0; fi
+if [[ "$UNIOPT_ACTION" == gui ]]; then
+  UNIOPT_DEMO_BIN="${UNIOPT_BIN:-$ROOT_DIR/bin/uniopt}"
+  [[ -x "$UNIOPT_DEMO_BIN" ]] || { printf 'uniopt-demo: cannot find bin/uniopt; set UNIOPT_BIN\n' >&2; exit 2; }
+  exec "$UNIOPT_DEMO_BIN" gui "$UNIOPT_DEMO_SCHEMA" uniopt_demo_schema -- "$0"
+fi
+uniopt_get_all metadata.tag
+TAGS=()
+if (( ${#UNIOPT_RESULT[@]} )); then TAGS=("${UNIOPT_RESULT[@]}"); fi
+uniopt_get_all greeting.extra
+EXTRA_WORDS=()
+if (( ${#UNIOPT_RESULT[@]} )); then EXTRA_WORDS=("${UNIOPT_RESULT[@]}"); fi
+
+case "$STYLE" in
+  friendly) message="Hello, $RECIPIENT! From $SENDER." ;;
+  formal) message="Greetings, $RECIPIENT. Sincerely, $SENDER." ;;
+  terse) message="Hi $RECIPIENT — $SENDER" ;;
+esac
+
+if [[ "$LOUD" == true ]]; then
+  message="$(printf '%s' "$message" | LC_ALL=C tr 'a-z' 'A-Z')"
+fi
+
+if (( ${#TAGS[@]} )); then
+  message+=" [tags:"
+  for tag in "${TAGS[@]}"; do message+=" $tag"; done
+  message+="]"
+fi
+if (( ${#EXTRA_WORDS[@]} )); then
+  message+=" [extra:"
+  for word in "${EXTRA_WORDS[@]}"; do message+=" <$word>"; done
+  message+="]"
+fi
+
+if [[ "$SHOW_SOURCES" == true ]]; then
+  printf 'style source: %s\n' "$(uniopt_get_source greeting.style)" >&2
+  printf 'color source: %s\n' "$(uniopt_get_source output.color)" >&2
+fi
+
+if [[ "$OUTPUT" == - ]]; then printf '%s\n' "$message"; else printf '%s\n' "$message" >"$OUTPUT"; fi

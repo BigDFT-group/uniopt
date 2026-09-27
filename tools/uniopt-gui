@@ -1,0 +1,46 @@
+#!/usr/bin/env python3
+"""Launch a UniOpt graphical command-line advisor."""
+
+import argparse
+import os
+from pathlib import Path
+import sys
+
+sys.dont_write_bytecode = True
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "tools"))
+from uniopt_gui import AdvisorModel, AdvisorRunner, load_schema, run_qt, run_tk, run_web
+
+
+def main():
+    parser=argparse.ArgumentParser()
+    parser.add_argument("--backend",choices=("auto","tk","qt","web"),default="auto")
+    parser.add_argument("--uniopt-bin",required=True)
+    parser.add_argument("--schema",required=True)
+    parser.add_argument("--function",required=True)
+    parser.add_argument("--port",type=int,default=0)
+    parser.add_argument("--open",action="store_true",help="open the web frontend in a browser")
+    parser.add_argument("program",nargs=argparse.REMAINDER)
+    args=parser.parse_args()
+    if args.program and args.program[0]=="--": args.program=args.program[1:]
+    if not args.program: parser.error("PROGRAM is required after --")
+    schema=load_schema(args.uniopt_bin,args.schema,args.function); model=AdvisorModel(schema); runner=AdvisorRunner(args.uniopt_bin,args.schema,args.function,args.program)
+    backend=args.backend
+    if backend=="auto":
+        try:
+            import PySide6
+            if sys.platform.startswith("linux") and not (os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")): raise RuntimeError("no display")
+            backend="qt"
+        except Exception:
+            try:
+                import tkinter
+                if sys.platform.startswith("linux") and not (os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")): raise RuntimeError("no display")
+                backend="tk"
+            except Exception:
+                backend="web"
+    if backend=="tk": return run_tk(model,runner)
+    if backend=="qt": return run_qt(model,runner)
+    return run_web(model,runner,ROOT/"tools"/"uniopt-json-to-html",args.port,args.open)
+
+
+if __name__=="__main__": raise SystemExit(main())

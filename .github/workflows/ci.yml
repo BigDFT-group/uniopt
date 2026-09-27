@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  documentation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+          cache: pip
+      - run: python -m pip install -r requirements-docs.txt
+      - run: ./scripts/check-docs
+      - run: mkdocs build --strict
+      - run: cp llms.txt llms-full.txt site/
+      - name: Assert agent files are at the Pages root
+        run: test -s site/llms.txt && test -s site/llms-full.txt
+
+  current-bash:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test with current Bash
+        run: bash tests/all.sh
+
+  bash-3-2:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build prerequisites
+        run: sudo apt-get update && sudo apt-get install -y build-essential curl patch
+      - name: Build pinned Bash 3.2.57
+        run: bash ci/build-bash-3.2.sh "$RUNNER_TEMP/bash-3.2"
+      - name: Test and syntax-check with Bash 3.2.57
+        run: "$RUNNER_TEMP/bash-3.2/bin/bash" tests/all.sh
+
+  macos-system-bash:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assert system Bash 3.2
+        run: /bin/bash -c '[[ ${BASH_VERSINFO[0]} == 3 && ${BASH_VERSINFO[1]} == 2 ]]'
+      - name: Test with macOS system Bash
+        run: /bin/bash tests/all.sh

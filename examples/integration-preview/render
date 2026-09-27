@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(cd "$HERE/../.." && pwd)"
+MODE="${1-}"
+COMMAND="${2-}"
+[[ -n "$MODE" && -n "$COMMAND" ]] || { printf 'usage: render {help|markdown|json|completion|gui} COMMAND\n' >&2; exit 2; }
+
+case "$MODE" in
+  help|markdown|json|completion)
+    UNIOPT_PREVIEW_COMMAND="$COMMAND" "$ROOT/bin/uniopt" "$MODE" "$HERE/schemas.sh" integration_preview_schema
+    ;;
+  gui)
+    UNIOPT_PREVIEW_COMMAND="$COMMAND" "$ROOT/bin/uniopt" json "$HERE/schemas.sh" integration_preview_schema \
+      | python3 "$ROOT/tools/uniopt-json-to-html" -
+    ;;
+  *) printf 'unknown render mode: %s\n' "$MODE" >&2; exit 2 ;;
+esac

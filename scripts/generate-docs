@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SCHEMA="$ROOT_DIR/examples/uniopt-demo/schema.sh"
+FUNCTION=uniopt_demo_schema
+OUTPUT_DIR="$ROOT_DIR/docs/generated"
+COMPLETION="$ROOT_DIR/examples/uniopt-demo/completion/uniopt-demo.bash"
+CHECK=0
+[[ "${1-}" == --check ]] && CHECK=1
+
+TEMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/uniopt-docs.XXXXXX")"
+trap 'rm -rf "$TEMP_DIR"' EXIT
+
+"$ROOT_DIR/bin/uniopt" help "$SCHEMA" "$FUNCTION" >"$TEMP_DIR/uniopt-demo.help.txt"
+"$ROOT_DIR/bin/uniopt" markdown "$SCHEMA" "$FUNCTION" >"$TEMP_DIR/uniopt-demo.md"
+"$ROOT_DIR/bin/uniopt" json "$SCHEMA" "$FUNCTION" >"$TEMP_DIR/uniopt-demo.schema.json"
+"$ROOT_DIR/bin/uniopt" completion "$SCHEMA" "$FUNCTION" >"$TEMP_DIR/uniopt-demo.bash"
+
+if (( CHECK )); then
+  diff -u "$OUTPUT_DIR/uniopt-demo.help.txt" "$TEMP_DIR/uniopt-demo.help.txt"
+  diff -u "$OUTPUT_DIR/uniopt-demo.md" "$TEMP_DIR/uniopt-demo.md"
+  diff -u "$OUTPUT_DIR/uniopt-demo.schema.json" "$TEMP_DIR/uniopt-demo.schema.json"
+  diff -u "$COMPLETION" "$TEMP_DIR/uniopt-demo.bash"
+else
+  mkdir -p "$OUTPUT_DIR" "$(dirname "$COMPLETION")"
+  cp "$TEMP_DIR/uniopt-demo.help.txt" "$OUTPUT_DIR/uniopt-demo.help.txt"
+  cp "$TEMP_DIR/uniopt-demo.md" "$OUTPUT_DIR/uniopt-demo.md"
+  cp "$TEMP_DIR/uniopt-demo.schema.json" "$OUTPUT_DIR/uniopt-demo.schema.json"
+  cp "$TEMP_DIR/uniopt-demo.bash" "$COMPLETION"
+fi
+
+if (( CHECK )); then
+  "$ROOT_DIR/scripts/generate-integration-docs" --check
+else
+  "$ROOT_DIR/scripts/generate-integration-docs"
+fi

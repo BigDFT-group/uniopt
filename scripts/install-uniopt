@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PREFIX="${PREFIX:-/usr/local}"
+DESTDIR="${DESTDIR:-}"
+BINDIR="$DESTDIR$PREFIX/bin"
+DATADIR="$DESTDIR$PREFIX/share/uniopt"
+
+mkdir -p "$BINDIR" "$DATADIR/lib" "$DATADIR/docs" "$DATADIR/tools"
+cp "$ROOT_DIR/bin/uniopt" "$BINDIR/uniopt"
+cp "$ROOT_DIR/lib/uniopt.sh" "$DATADIR/lib/uniopt.sh"
+cp "$ROOT_DIR/tools/uniopt-gui" "$ROOT_DIR/tools/uniopt_gui.py" "$ROOT_DIR/tools/uniopt-json-to-html" "$DATADIR/tools/"
+cp "$ROOT_DIR/README.md" "$DATADIR/docs/README.md"
+for document in "$ROOT_DIR"/docs/*.md; do cp "$document" "$DATADIR/docs/$(basename "$document")"; done
+chmod 0755 "$BINDIR/uniopt"
+chmod 0755 "$DATADIR/tools/uniopt-gui" "$DATADIR/tools/uniopt-json-to-html"
+chmod 0644 "$DATADIR/lib/uniopt.sh" "$DATADIR/tools/uniopt_gui.py" "$DATADIR/docs"/*.md
+
+printf 'Installed UniOpt under %s%s\n' "$DESTDIR" "$PREFIX"

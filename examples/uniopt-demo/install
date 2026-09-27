@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+PREFIX="${PREFIX:-$HOME/.local}"
+DESTDIR="${DESTDIR:-}"
+BINDIR="$DESTDIR$PREFIX/bin"
+APPDIR="$DESTDIR$PREFIX/share/uniopt-demo"
+COMPLETION_DIR="$DESTDIR$PREFIX/share/bash-completion/completions"
+
+mkdir -p "$BINDIR" "$APPDIR/lib" "$COMPLETION_DIR"
+cp "$SCRIPT_DIR/uniopt-demo" "$BINDIR/uniopt-demo"
+cp "$SCRIPT_DIR/schema.sh" "$APPDIR/schema.sh"
+cp "$ROOT_DIR/lib/uniopt.sh" "$APPDIR/lib/uniopt.sh"
+cp "$SCRIPT_DIR/completion/uniopt-demo.bash" "$COMPLETION_DIR/uniopt-demo"
+chmod 0755 "$BINDIR/uniopt-demo"
+chmod 0644 "$APPDIR/schema.sh" "$APPDIR/lib/uniopt.sh" "$COMPLETION_DIR/uniopt-demo"
+
+printf 'Installed command:    %s/uniopt-demo\n' "$BINDIR"
+printf 'Installed completion: %s/uniopt-demo\n' "$COMPLETION_DIR"
+printf 'Ensure %s is in PATH, then start a new Bash shell.\n' "$PREFIX/bin"
+printf 'If Bash does not load completion files automatically, run:\n'
+printf '  source %q\n' "$PREFIX/share/bash-completion/completions/uniopt-demo"

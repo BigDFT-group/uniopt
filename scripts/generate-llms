@@ -1,0 +1,102 @@
+#!/usr/bin/env python3
+"""Generate llms.txt and llms-full.txt from UniOpt's maintained manuals."""
+
+from pathlib import Path
+import argparse
+import difflib
+import sys
+
+ROOT = Path(__file__).resolve().parents[1]
+
+LLMS = """# UniOpt
+
+> UniOpt is a declarative Bash 3.2+ command-line option library. A single schema drives parsing, validation, help, Markdown, Bash completion, JSON introspection, and an optional GUI command-line advisor while preserving exact argv boundaries.
+
+Use `lib/uniopt.sh` from Bash. Schema registration and introspection are side-effect-free. The parser does not use `eval`, generated parser files, or whitespace serialization. Semantic option IDs are stable and separate from CLI spellings.
+
+## Public API
+
+- [`uniopt_reset`](https://bigdft-group.github.io/uniopt/api-reference/#uniopt_reset): clear the active schema and result state; no arguments.
+- [`uniopt_schema COMMAND [ATTRIBUTES]`](https://bigdft-group.github.io/uniopt/api-reference/#uniopt_schema-command-attributes): set command metadata; accepts `--summary`, `--ui-confirm`, `--unknown`, and `--unknown-dest`. It reserves `-h`, `--help`, and `--gui`.
+- [`uniopt_option ID ATTRIBUTES`](https://bigdft-group.github.io/uniopt/api-reference/#uniopt_option-id-attributes): declare an option, type, spelling, destination, default, validation, repetition, and optional UI metadata.
+- [`uniopt_alias ID ATTRIBUTES`](https://bigdft-group.github.io/uniopt/api-reference/#uniopt_alias-id-attributes): declare a no-value spelling that stores constants in other semantic options.
+- [`uniopt_positional ID ATTRIBUTES`](https://bigdft-group.github.io/uniopt/api-reference/#uniopt_positional-id-attributes): declare required, optional, or remainder positional values.
+- [`uniopt_constraint KIND ID...`](https://bigdft-group.github.io/uniopt/api-reference/#uniopt_constraint-kind-id): declare `mutex`, `one-of`, `requires`, or `conflicts` relationships.
+- [`uniopt_parse ARG...`](https://bigdft-group.github.io/uniopt/api-reference/#uniopt_parse-arg): apply defaults, parse the exact argv, validate, and set `UNIOPT_ACTION` for built-in help or GUI requests.
+- [`uniopt_validate`](https://bigdft-group.github.io/uniopt/api-reference/#uniopt_validate): validate registered constraints against parsed explicit occurrences.
+- [`uniopt_get ID [OUTPUT_VARIABLE]`](https://bigdft-group.github.io/uniopt/api-reference/#uniopt_get-id-output_variable): read one scalar value safely.
+- [`uniopt_get_source ID`](https://bigdft-group.github.io/uniopt/api-reference/#uniopt_get_source-id): read value provenance.
+- [`uniopt_get_all ID`](https://bigdft-group.github.io/uniopt/api-reference/#uniopt_get_all-id): copy a repeatable or remainder result into `UNIOPT_RESULT`.
+- [`uniopt_get_unknown`](https://bigdft-group.github.io/uniopt/api-reference/#uniopt_get_unknown): copy collected unknown arguments into `UNIOPT_RESULT`.
+- [`uniopt_help`](https://bigdft-group.github.io/uniopt/api-reference/#uniopt_help), [`uniopt_markdown`](https://bigdft-group.github.io/uniopt/api-reference/#uniopt_markdown), [`uniopt_json`](https://bigdft-group.github.io/uniopt/api-reference/#uniopt_json), and [`uniopt_completion`](https://bigdft-group.github.io/uniopt/api-reference/#uniopt_completion-command-function): render deterministic interfaces from the active schema.
+
+Compatibility names `uniopt_value`, `uniopt_provenance`, and `uniopt_values` delegate to the getter API. Complete attributes, types, validation behavior, JSON fields, GUI metadata, and migration notes are in the public API reference.
+
+## Declaration option summary
+
+- Schema: `--summary TEXT`, `--ui-confirm TEXT`, `--unknown error|collect|stop`, and `--unknown-dest VARIABLE`.
+- Option identity and storage: `--short -x`, `--long --name`, `--neg-long --no-name`, `--dest VARIABLE`, `--type TYPE`, `--metavar WORD`, and `--help TEXT`.
+- Option defaults and behavior: `--default VALUE`, `--default-fn FUNCTION`, `--default-env VARIABLE`, `--repeatable`, `--required`, `--internal`, `--choice VALUE`, `--validator FUNCTION`, and `--store-const VALUE`.
+- Alias: `--short`, `--long`, `--help`, repeated `--set OPTION_ID VALUE`, and the common UI attributes.
+- Positional: `--dest`, `--type`, `--metavar`, `--help`, `--required`, `--remainder`, `--validator`, and the common UI attributes.
+- UI presentation: `--ui-label`, `--ui-group`, `--ui-control`, `--ui-placeholder`, `--ui-advanced`, `--ui-order`, `--ui-min`, `--ui-max`, `--ui-step`, and path-only `--ui-file-mode auto|open|save|directory`.
+- Types: `string`, `path`, `int`, `integer`, `uint`, `enum`, `boolean`, and `tristate`.
+- Completion: `uniopt_completion [COMMAND [FUNCTION]]`; omitted values derive from the schema command.
+
+## Documentation
+
+- [User guide](https://bigdft-group.github.io/uniopt/user-guide/): adoption tutorial and examples.
+- [Public API reference](https://bigdft-group.github.io/uniopt/api-reference/): complete function signatures and every declaration attribute.
+- [Installation and GUI](https://bigdft-group.github.io/uniopt/installation-and-gui/): packaging, frontend selection, and path controls.
+- [GUI advisor design](https://bigdft-group.github.io/uniopt/gui-design/): argv model, validation, execution, and security boundaries.
+- [Bash 3.2 compatibility](https://bigdft-group.github.io/uniopt/bash-3.2-compatibility/): supported language baseline and result API.
+- [Full documentation as text](https://bigdft-group.github.io/uniopt/llms-full.txt): manuals combined into one agent-friendly file.
+
+## Source
+
+- [GitHub repository](https://github.com/bigdft-group/uniopt)
+- [Runnable demo](https://github.com/bigdft-group/uniopt/tree/main/examples/uniopt-demo)
+- [WISE and ContainerXP interface previews](https://github.com/bigdft-group/uniopt/tree/main/examples/integration-preview)
+"""
+
+FULL_DOCUMENTS = (
+    "README.md",
+    "docs/user-guide.md",
+    "docs/api-reference.md",
+    "docs/distributing-a-script.md",
+    "docs/installation-and-gui.md",
+    "docs/gui-design.md",
+    "docs/bash-3.2-compatibility.md",
+    "docs/test-coverage.md",
+)
+
+
+def full_text():
+    sections = ["# UniOpt complete documentation\n"]
+    for name in FULL_DOCUMENTS:
+        sections.append("\n---\n\n<!-- Source: %s -->\n\n%s" % (name, (ROOT / name).read_text(encoding="utf-8").rstrip()))
+    return "".join(sections) + "\n"
+
+
+def update(path, content, check):
+    old = path.read_text(encoding="utf-8") if path.exists() else ""
+    if old == content:
+        return True
+    if check:
+        sys.stderr.writelines(difflib.unified_diff(old.splitlines(True), content.splitlines(True), fromfile=str(path), tofile="generated"))
+        return False
+    path.write_text(content, encoding="utf-8")
+    return True
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--check", action="store_true")
+    args = parser.parse_args()
+    good = update(ROOT / "llms.txt", LLMS, args.check)
+    good = update(ROOT / "llms-full.txt", full_text(), args.check) and good
+    return 0 if good else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,0 +1,20 @@
+Usage: uniopt-demo RECIPIENT [-- WORD...]
+
+Build a greeting while demonstrating UniOpt's schema-driven interfaces.
+
+Options:
+  -h, --help           Show help and exit (default: false)
+  --gui                Open the graphical command-line advisor (default: false)
+  -n, --name NAME      Name of the sender (default: dynamic)
+  -s, --style STYLE    Greeting style (default: friendly)
+  -o, --output PATH    Write to PATH instead of standard output (default: -)
+  --loud               Use uppercase output (default: false)
+  --color, --no-color  Enable, disable, or inherit terminal color (default: inherit)
+  -j, --jobs N         Positive worker count (default: 1)
+  -t, --tag TAG        Attach a tag; may be repeated (repeatable)
+  --show-sources       Print selected value provenance (default: false)
+  --quick              Alias for terse, uppercase output
+
+Arguments:
+  RECIPIENT            Person or group to greet
+  WORD                 Extra words preserved after --

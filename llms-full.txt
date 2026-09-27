@@ -1,0 +1,1363 @@
+# UniOpt complete documentation
+
+---
+
+<!-- Source: README.md -->
+
+# UniOpt
+
+UniOpt is a declarative command-line option library for Bash 3.2+. One schema
+drives parsing, validation, terminal help, Markdown, Bash completion, and JSON
+introspection while preserving exact argument boundaries.
+
+Start with the [documentation index](docs/README.md), the
+[external-user guide](docs/user-guide.md), and the runnable
+[`uniopt-demo`](examples/uniopt-demo/README.md). The complete public contract is
+in the [API reference](docs/api-reference.md). Installation choices and the
+JSON-to-GUI design are covered in
+[installation and GUI integration](docs/installation-and-gui.md).
+The published manual is available at
+[bigdft-group.github.io/uniopt](https://bigdft-group.github.io/uniopt/), with
+[`llms.txt`](https://bigdft-group.github.io/uniopt/llms.txt) and
+[`llms-full.txt`](https://bigdft-group.github.io/uniopt/llms-full.txt) at the
+site root for coding agents.
+The native and generic runner contract is specified in the
+[GUI line-advisor design](docs/gui-design.md).
+For application packaging, see
+[distributing an installable command](docs/distributing-a-script.md).
+
+Launch the schema-generated demo GUI with:
+
+```bash
+./examples/uniopt-demo/uniopt-demo --gui
+```
+
+To assess migration effort against representative WISE and ContainerXP
+interfaces, use the runnable [integration previews](examples/integration-preview/README.md).
+They generate completion, Markdown, JSON, and static GUI forms without running
+Docker or modifying either source project.
+
+Run the complete syntax, static, and behavior suite with:
+
+```bash
+./tests/all.sh
+```
+
+Regenerate and verify schema-derived documentation with:
+
+```bash
+./scripts/generate-docs
+./scripts/check-docs
+```
+
+Render any schema file that declares a schema when sourced, or name a function
+in a file containing several schemas:
+
+```bash
+./bin/uniopt json examples/wise-schemas.sh wise_schema_env
+./bin/uniopt help examples/wise-schemas.sh wise_schema_shell
+```
+
+This repository is a standalone design. WISE and ContainerXP are inputs to its
+behavior requirements; neither project is modified by this prototype.
+
+CI runs the full suite with current Bash, a checksum-pinned GNU Bash 3.2.57
+build, and macOS `/bin/bash`. See
+[`docs/bash-3.2-compatibility.md`](docs/bash-3.2-compatibility.md) for the
+compatibility policy and result API migration.
+
+Contribution rules are in [CONTRIBUTING.md](CONTRIBUTING.md), and the
+[release checklist](docs/releasing.md) describes publication and tagging.
+
+UniOpt is distributed under the [MIT License](LICENSE).
+---
+
+<!-- Source: docs/user-guide.md -->
+
+# Using UniOpt in a Bash program
+
+UniOpt lets a Bash program describe its command line once and reuse that schema
+for parsing, validation, help, documentation, completion, and machine-readable
+metadata. It requires Bash 3.2 or later and preserves the original argument
+boundaries throughout parsing.
+
+## Why use it
+
+A hand-written `case` parser usually duplicates the same facts in several
+places: parsing code, default initialization, validation, `--help`, README
+tables, and completion. Those copies drift. UniOpt keeps the option ID, CLI
+spellings, type, default, help, and constraints in one declaration.
+
+The practical benefits are:
+
+- values containing spaces, empty strings, wildcard characters, quotes,
+  backslashes, Unicode, and newlines remain separate arguments;
+- validation and relationships between options are applied consistently;
+- every value has provenance, so the application can distinguish a default,
+  inherited setting, environment setting, callback result, or CLI override;
+- terminal help, Markdown, JSON, and completion come from the same schema;
+- stable semantic IDs let a GUI or another integration survive spelling changes;
+- the parser uses no `eval`, generated parser scripts, or temporary files.
+
+## Start with the demo
+
+From the repository root:
+
+```bash
+./examples/uniopt-demo/uniopt-demo --help
+./examples/uniopt-demo/uniopt-demo --style formal --tag docs --tag public Ada
+./examples/uniopt-demo/uniopt-demo --quick --show-sources Ada -- '' 'two words' '*'
+```
+
+Read the [demo schema](https://github.com/bigdft-group/uniopt/blob/main/examples/uniopt-demo/schema.sh) beside the
+[demo program](https://github.com/bigdft-group/uniopt/blob/main/examples/uniopt-demo/uniopt-demo). The schema has no
+application side effects, so `bin/uniopt` can safely inspect it.
+
+For larger, real-world interfaces, the
+[WISE and ContainerXP integration previews](https://github.com/bigdft-group/uniopt/tree/main/examples/integration-preview)
+provide nine side-effect-free command twins. They show the schema and packaging
+work required to add completion and GUI forms before either application is
+migrated.
+
+## Structure your program
+
+Keep registration in a function, preferably in a separate schema file:
+
+```bash
+mytool_schema() {
+  uniopt_reset
+  uniopt_schema mytool --summary "Process an input file" --unknown error
+
+  uniopt_option output.format \
+    --short -f --long --format --dest FORMAT --type enum \
+    --choice text --choice json --default text \
+    --metavar FORMAT --help "Output format"
+
+  uniopt_option input.include \
+    --short -I --long --include --dest INCLUDES --type path --repeatable \
+    --metavar PATH --help "Additional input path"
+
+  uniopt_positional input.file \
+    --dest INPUT --type path --required --metavar INPUT \
+    --help "Input file"
+}
+```
+
+Then load, register, and parse:
+
+```bash
+#!/usr/bin/env bash
+set -u
+
+source /path/to/uniopt.sh
+source /path/to/mytool-schema.sh
+mytool_schema
+
+uniopt_parse "$@" || exit 2
+if [[ "$UNIOPT_ACTION" == help ]]; then uniopt_help; exit 0; fi
+if [[ "$UNIOPT_ACTION" == gui ]]; then
+  exec uniopt gui /path/to/mytool-schema.sh mytool_schema -- "$0"
+fi
+
+uniopt_get_all input.include
+INCLUDES=("${UNIOPT_RESULT[@]}")
+
+printf 'format=%s input=%s\n' "$FORMAT" "$INPUT"
+for path in "${INCLUDES[@]}"; do
+  printf 'include=%s\n' "$path"
+done
+```
+
+Scalar values are also available by semantic ID with `uniopt_get`. Repeatable,
+remainder, and collected unknown values use `UNIOPT_RESULT`; copy it before the
+next multi-value getter.
+
+## Help and application control options
+
+`uniopt_schema` automatically registers reserved `-h`/`--help` and `--gui`
+options. `uniopt_parse` recognizes them before required-input validation and
+sets `UNIOPT_ACTION` to `help` or `gui`. Handle that action immediately after
+parsing, before application side effects. The GUI command opens a Basic and an
+Advanced area, marks constrained fields as conditional, validates with the
+same parser, and then runs the fixed executable with the constructed argv.
+
+For tools that expose several introspection modes, keep the schema in a
+side-effect-free file and use the companion command:
+
+```bash
+uniopt help mytool-schema.sh mytool_schema
+uniopt markdown mytool-schema.sh mytool_schema
+uniopt json mytool-schema.sh mytool_schema
+uniopt completion mytool-schema.sh mytool_schema
+```
+
+## Defaults and provenance
+
+Choose one default source for a scalar option:
+
+```bash
+uniopt_option output.format --long --format --dest FORMAT --default text
+uniopt_option auth.token --long --token --dest TOKEN --default-env MYTOOL_TOKEN
+uniopt_option runtime.dir --long --runtime-dir --dest RUNTIME_DIR \
+  --default-fn mytool_default_runtime_dir
+```
+
+A default callback receives the name of an output variable:
+
+```bash
+mytool_default_runtime_dir() {
+  printf -v "$1" '%s' "${TMPDIR:-/tmp}/mytool"
+}
+```
+
+Callbacks and environment reads happen during `uniopt_parse`, never during
+help, Markdown, JSON, or completion generation. Query the selected source with:
+
+```bash
+printf 'format came from %s\n' "$(uniopt_get_source output.format)"
+```
+
+## Booleans, tri-state values, and aliases
+
+A boolean with a negative spelling records explicit enable/disable choices:
+
+```bash
+uniopt_option output.color --long --color --neg-long --no-color \
+  --dest COLOR --type boolean --default true
+```
+
+Use `tristate` when omission means “inherit from another configuration layer”:
+
+```bash
+uniopt_option output.color --long --color --neg-long --no-color \
+  --dest COLOR --type tristate --default inherit
+```
+
+Aliases are preset actions and can update several semantic options atomically:
+
+```bash
+uniopt_alias preset.quick --long --quick \
+  --set output.format text --set output.loud true \
+  --help "Select terse, loud output"
+```
+
+## Constraints
+
+Declare constraints after all referenced IDs:
+
+```bash
+uniopt_constraint mutex mode.client mode.server
+uniopt_constraint one-of action.create action.update action.delete
+uniopt_constraint requires tls.cert tls.enabled
+uniopt_constraint conflicts network.host network.publish
+```
+
+`mutex` permits zero or one explicit member. `one-of` requires exactly one.
+Defaults do not count as explicit occurrences.
+
+## Bash completion
+
+Generate and source a completion definition:
+
+```bash
+bin/uniopt completion mytool-schema.sh mytool_schema >mytool.bash
+source mytool.bash
+```
+
+UniOpt completes option spellings, enum values, and paths for path-typed
+options. The generated code uses Bash's `complete`, `compgen`, and `COMPREPLY`
+interfaces. It works without an additional package, although a completion
+manager can load installed definitions automatically. The GNU Bash manual
+documents the underlying [programmable completion model](https://www.gnu.org/software/bash/manual/html_node/Programmable-Completion.html).
+
+For a universally portable per-user setup, source the generated file from
+`~/.bash_profile`. On macOS, Homebrew documents both the system-Bash-compatible
+`bash-completion` package and its completion search paths in its
+[shell completion guide](https://docs.brew.sh/Shell-Completion).
+
+## Generate documentation and JSON
+
+The same schema can produce a checked-in CLI reference and GUI input:
+
+```bash
+bin/uniopt markdown mytool-schema.sh mytool_schema >mytool-options.md
+bin/uniopt json mytool-schema.sh mytool_schema >mytool.schema.json
+```
+
+Regenerate these files in the project build and fail CI when the committed
+copies differ. UniOpt itself demonstrates this with `scripts/generate-docs` and
+`scripts/check-docs`.
+
+See the [complete API reference](api-reference.md) for every function,
+attribute, type, status, and public result variable.
+
+To distribute the finished command with generated completion, follow
+[Distributing an installable UniOpt command](distributing-a-script.md).
+---
+
+<!-- Source: docs/api-reference.md -->
+
+# UniOpt public API reference
+
+This page is the complete public contract for `lib/uniopt.sh`. Functions whose
+names begin with `uniopt__` and registry variables not named here are internal.
+CI checks that every public `uniopt_*` function and every declaration attribute
+appears in this page.
+
+## General contract
+
+- Minimum interpreter: Bash 3.2.
+- Declaration and renderer functions return zero on success.
+- Parser and validation errors return status 2, set `UNIOPT_ERROR`, and print a
+  diagnostic prefixed with `uniopt:` to standard error.
+- Semantic IDs match `[a-z][a-z0-9_.-]*` and are independent of CLI spellings.
+- Destination and callback-output variable names must be ordinary Bash
+  identifiers.
+- Schema registration and rendering do not execute dynamic defaults,
+  environment reads, validators, or application logic.
+
+## Public variables
+
+| Variable | Meaning |
+|---|---|
+| `UNIOPT_ERROR` | Most recent UniOpt diagnostic without the `uniopt:` prefix |
+| `UNIOPT_ACTION` | Empty after an ordinary parse, `help` after `-h`/`--help`, or `gui` after `--gui` |
+| `UNIOPT_RESULT` | Indexed result array replaced by `uniopt_get_all` or `uniopt_get_unknown` |
+| `UNIOPT_INTROSPECT` | Set to `1` by `bin/uniopt` while sourcing a schema file |
+| `UNIOPT_LIB` | Optional path overriding library discovery in `bin/uniopt` |
+
+Application destinations declared with `--dest` are also assigned for scalar
+options and scalar positionals. Repeatable, remainder, and unknown values must
+be read through the result getters.
+
+## Schema lifecycle
+
+### `uniopt_reset`
+
+Clears the active schema, parsed values, constraints, and result arrays. Call it
+before registering a command. The library calls it once when sourced.
+
+### `uniopt_schema COMMAND [ATTRIBUTES]`
+
+Starts command metadata after a reset.
+
+| Attribute | Argument | Meaning |
+|---|---|---|
+| `--summary` | `TEXT` | One-line command description |
+| `--ui-confirm` | `TEXT` | Confirmation shown by a GUI immediately before execution |
+| `--unknown` | `error`, `collect`, or `stop` | Unknown-argument policy; default `error` |
+| `--unknown-dest` | `VARIABLE` | Compatibility metadata required by `collect` and `stop` |
+
+`collect` keeps parsing later known options. `stop` places the first unknown
+argument and the untouched tail in the unknown result.
+
+### `uniopt_option ID ATTRIBUTES`
+
+Declares an option or an internal scalar target.
+
+| Attribute | Argument | Meaning |
+|---|---|---|
+| `--short` | `-x` | One-character short spelling |
+| `--long` | `--name` | Long spelling |
+| `--neg-long` | `--no-name` | Negative boolean or tri-state spelling |
+| `--dest` | `VARIABLE` | Scalar destination; required for all options |
+| `--type` | `TYPE` | Value type; default `string` |
+| `--default` | `VALUE` | Literal scalar default |
+| `--default-fn` | `FUNCTION` | Parser-time callback receiving an output-variable name |
+| `--default-env` | `VARIABLE` | Parser-time shell/environment variable default |
+| `--metavar` | `WORD` | Value label in help and documentation |
+| `--help` | `TEXT` | User-facing description |
+| `--repeatable` | none | Store every occurrence as a multi-value result |
+| `--required` | none | Require an explicit occurrence |
+| `--internal` | none | Hide a spelling-free target used by aliases |
+| `--choice` | `VALUE` | Add an enum value; repeat for each choice |
+| `--validator` | `FUNCTION` | Call `FUNCTION VALUE`; zero accepts the value |
+| `--store-const` | `VALUE` | Consume no argument and store the constant |
+| `--ui-label` | `TEXT` | Preferred GUI field label |
+| `--ui-group` | `TEXT` | GUI section name |
+| `--ui-control` | `CONTROL` | Advisory widget choice; default `auto` |
+| `--ui-placeholder` | `TEXT` | Advisory empty-field prompt |
+| `--ui-advanced` | none | Mark the field as advanced |
+| `--ui-order` | `INTEGER` | Sort key within a generated GUI |
+| `--ui-min` | `VALUE` | Advisory lower bound for a numeric widget |
+| `--ui-max` | `VALUE` | Advisory upper bound for a numeric widget |
+| `--ui-step` | `VALUE` | Advisory numeric-widget increment |
+| `--ui-file-mode` | `auto`, `open`, `save`, or `directory` | Native chooser behavior for a path |
+
+An option needs `--short` or `--long` unless it is `--internal`. Static,
+environment, and callback defaults are mutually exclusive. Repeatable options
+cannot have scalar defaults.
+
+Supported types:
+
+| Type | Validation and presentation |
+|---|---|
+| `string` | Any scalar string |
+| `path` | Any scalar string; enables path completion |
+| `int`, `integer` | Optional minus sign followed by digits |
+| `uint` | Digits only |
+| `enum` | Exact match with one of the `--choice` values |
+| `boolean` | `true` or `false`; CLI spellings consume no value |
+| `tristate` | `inherit`, `true`, or `false`; positive/negative spellings set explicit states |
+
+### `uniopt_alias ID ATTRIBUTES`
+
+Declares a no-argument preset action.
+
+| Attribute | Argument | Meaning |
+|---|---|---|
+| `--short` | `-x` | Optional short spelling |
+| `--long` | `--name` | Optional long spelling |
+| `--help` | `TEXT` | User-facing description |
+| `--set` | `OPTION_ID VALUE` | Assign a previously declared option; repeat as needed |
+| `--ui-label` | `TEXT` | Preferred GUI action label |
+| `--ui-group` | `TEXT` | GUI section name |
+| `--ui-control` | `CONTROL` | Advisory widget choice |
+| `--ui-placeholder` | `TEXT` | Advisory prompt if the renderer uses an input widget |
+| `--ui-advanced` | none | Mark the action as advanced |
+| `--ui-order` | `INTEGER` | Sort key within a generated GUI |
+
+At least one spelling and one `--set` are required. Target values pass through
+the target option's type and custom validation.
+
+### `uniopt_positional ID ATTRIBUTES`
+
+Declares one positional argument.
+
+| Attribute | Argument | Meaning |
+|---|---|---|
+| `--dest` | `VARIABLE` | Scalar compatibility destination; required |
+| `--type` | `TYPE` | Same type validation as options |
+| `--metavar` | `WORD` | Usage and documentation label |
+| `--help` | `TEXT` | User-facing description |
+| `--required` | none | Require the positional |
+| `--remainder` | none | Capture every remaining argument as a multi-value result |
+| `--validator` | `FUNCTION` | Additional parser-time validator |
+| `--ui-label` | `TEXT` | Preferred GUI field label |
+| `--ui-group` | `TEXT` | GUI section name |
+| `--ui-control` | `CONTROL` | Advisory widget choice |
+| `--ui-placeholder` | `TEXT` | Advisory empty-field prompt |
+| `--ui-advanced` | none | Mark the field as advanced |
+| `--ui-order` | `INTEGER` | Sort key within a generated GUI |
+| `--ui-file-mode` | `auto`, `open`, `save`, or `directory` | Native chooser behavior for a path |
+
+Only one remainder positional should be declared. A literal `--` ends option
+parsing and sends its untouched tail to that remainder.
+
+### GUI presentation attributes
+
+Presentation attributes are optional metadata. They appear under each item's
+`ui` object in JSON and have no effect on parsing, validation, help, Markdown,
+or completion. This separation lets a generic GUI improve its layout without
+changing the command contract.
+
+`CONTROL` is one of `auto`, `text`, `textarea`, `password`, `number`, `select`,
+`radio`, `checkbox`, `tristate`, `file`, `directory`, `list`, or `hidden`.
+Renderers may fall back to a control inferred from the core type when a hint is
+not practical. For example, a web page cannot turn a browser file upload into
+a local CLI path, while a native desktop renderer can use a file picker.
+
+`--ui-min`, `--ui-max`, and `--ui-step` are available on options. Their values
+are exported as strings so applications can choose an appropriate numeric
+representation. They are interface hints and do not replace a UniOpt type or
+custom validator. `--ui-order` must be an integer.
+`--ui-file-mode` is accepted only for `path` options and positionals; `auto`
+uses the control hint and otherwise opens an existing-file chooser.
+
+### Built-in control options
+
+Every call to `uniopt_schema` registers `interface.help` (`-h`, `--help`) and
+`interface.gui` (`--gui`). These stable IDs are exported in JSON and completion
+but hidden from generated GUI forms. Application declarations cannot reuse
+these spellings. Either action bypasses required-value checks and makes
+`uniopt_parse` return zero with `UNIOPT_ACTION` set. The application then
+renders help or launches the advisor before executing domain logic.
+
+### `uniopt_constraint KIND ID...`
+
+Adds a relationship between already declared IDs.
+
+| Kind | Cardinality | Rule |
+|---|---:|---|
+| `mutex` | two or more | At most one member may be explicit |
+| `one-of` | two or more | Exactly one member must be explicit; `one_of` is accepted as an alias |
+| `requires` | exactly two | The first explicit member requires the second |
+| `conflicts` | exactly two | The two members cannot both be explicit |
+
+## Parsing and validation
+
+### `uniopt_parse ARG...`
+
+Applies defaults, parses the supplied argument vector, validates values and
+required declarations, then calls `uniopt_validate`. Supported spellings are
+`--long value`, `--long=value`, and `-x value`. Short-option clusters are not
+expanded. Duplicate scalars use the last occurrence. Returns 0 or 2. Built-in
+help and GUI actions return 0 before required-value and constraint checks;
+inspect `UNIOPT_ACTION` immediately after parsing.
+
+### `uniopt_validate`
+
+Validates registered constraints against the current parsed occurrence state.
+`uniopt_parse` calls it automatically. It is public for applications that add
+explicit occurrence state through a future adapter before validation.
+
+## Reading parsed values
+
+### `uniopt_get ID [OUTPUT_VARIABLE]`
+
+Prints a scalar value with a trailing newline. With `OUTPUT_VARIABLE`, assigns
+the value without a subshell or newline loss. Rejects multi-value IDs.
+
+### `uniopt_get_source ID`
+
+Prints one provenance value: `unset`, `default`, `inherited`, `env:VARIABLE`,
+`dynamic:FUNCTION`, `cli:SPELLING`, or `positional`.
+
+### `uniopt_get_all ID`
+
+Copies a repeatable or remainder value into `UNIOPT_RESULT`, preserving one
+array element per original argument. Replaces the previous result.
+
+### `uniopt_get_unknown`
+
+Copies arguments handled by the `collect` or `stop` policy into
+`UNIOPT_RESULT`.
+
+### Compatibility getter names
+
+- `uniopt_value` calls `uniopt_get`.
+- `uniopt_provenance` calls `uniopt_get_source`.
+- `uniopt_values ID` calls `uniopt_get_all`. The removed second output-array
+  argument returns status 2 with a migration diagnostic.
+
+## Generated interfaces
+
+### `uniopt_help`
+
+Writes deterministic terminal usage and option/argument descriptions to
+standard output.
+
+### `uniopt_markdown`
+
+Writes a deterministic Markdown option table to standard output.
+
+### `uniopt_json`
+
+Writes a deterministic JSON object with `schema_version: 1`, command metadata,
+items, spellings, types, defaults, choices, alias assignments, stable semantic
+IDs, constraints, and optional presentation metadata in each item's `ui`
+object. Dynamic and environment default values remain unresolved.
+
+### `uniopt_completion [COMMAND [FUNCTION]]`
+
+Writes a Bash completion definition. `COMMAND` defaults to the schema command.
+`FUNCTION` defaults to `_uniopt_COMMAND` with hyphens converted to underscores
+and must be a Bash identifier. Completion covers option spellings, enum values,
+and path values for path-typed options.
+
+## Companion command
+
+`bin/uniopt` exposes renderers, parser-only validation, and the GUI advisor:
+
+```text
+uniopt {help|markdown|json|completion} SCHEMA_FILE [SCHEMA_FUNCTION]
+uniopt validate SCHEMA_FILE SCHEMA_FUNCTION -- [ARG...]
+uniopt gui SCHEMA_FILE SCHEMA_FUNCTION -- PROGRAM [FIXED_ARG...]
+```
+
+It sets `UNIOPT_INTROSPECT=1`, sources the trusted schema file, optionally calls
+the named registration function, and invokes the selected renderer. It locates
+the library in the repository layout, the installed `share/uniopt` layout, or
+the explicit `UNIOPT_LIB` path. Schema files supplied to this command are Bash
+code and must be trusted.
+
+`validate` runs defaults, parsing, types, custom validators, and constraints
+without application domain logic. `gui` fixes the executable before opening a
+Tk, Qt, or loopback web advisor, validates the constructed argv, then invokes
+that executable directly without a shell. Select a backend with
+`UNIOPT_GUI_BACKEND=auto|tk|qt|web`, a web port with `UNIOPT_GUI_PORT`, and
+automatic browser opening with `UNIOPT_GUI_OPEN=1`. `UNIOPT_PYTHON` selects the
+Python interpreter used for the optional advisor. The Bash parser and all
+non-GUI generators do not require Python.
+---
+
+<!-- Source: docs/distributing-a-script.md -->
+
+# Distributing an installable UniOpt command
+
+This guide shows how to package a Bash command so its parser, schema, and tab
+completion are installed together. The runnable reference is
+[`examples/uniopt-demo`](https://github.com/bigdft-group/uniopt/tree/main/examples/uniopt-demo).
+
+## Recommended project layout
+
+```text
+mytool/
+├── bin/mytool
+├── lib/uniopt.sh
+├── schema.sh
+├── completion/mytool.bash
+└── install
+```
+
+Keep the schema in a side-effect-free registration function:
+
+```bash
+mytool_schema() {
+  uniopt_reset
+  uniopt_schema mytool --summary "Example command"
+  uniopt_option output.format \
+    --long --format --dest FORMAT --type enum --default text \
+    --choice text --choice json --metavar FORMAT \
+    --help "Output format"
+  uniopt_positional input.file \
+    --dest INPUT --type path --required --metavar INPUT \
+    --help "Input file"
+}
+```
+
+Generate completion from that same schema:
+
+```bash
+bin/uniopt completion schema.sh mytool_schema >completion/mytool.bash
+```
+
+Regenerate it whenever the schema changes and compare the committed file in CI.
+UniOpt's `scripts/generate-docs --check` pattern shows how.
+
+## Make the executable relocatable
+
+During development, source the repository copy. After installation, find the
+application's private data relative to the installed command:
+
+```bash
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+if [[ -r "$SCRIPT_DIR/../share/mytool/lib/uniopt.sh" ]]; then
+  MYTOOL_LIB="$SCRIPT_DIR/../share/mytool/lib/uniopt.sh"
+  MYTOOL_SCHEMA="$SCRIPT_DIR/../share/mytool/schema.sh"
+else
+  MYTOOL_LIB="$SCRIPT_DIR/../lib/uniopt.sh"
+  MYTOOL_SCHEMA="$SCRIPT_DIR/../schema.sh"
+fi
+
+source "$MYTOOL_LIB"
+source "$MYTOOL_SCHEMA"
+mytool_schema
+uniopt_parse "$@" || exit 2
+if [[ "$UNIOPT_ACTION" == help ]]; then
+  uniopt_help
+  exit 0
+fi
+if [[ "$UNIOPT_ACTION" == gui ]]; then
+  exec "${UNIOPT_BIN:-uniopt}" gui "$MYTOOL_SCHEMA" mytool_schema -- "$0"
+fi
+```
+
+Resolve paths from `BASH_SOURCE`, never from the caller's working directory.
+`-h`, `--help`, and `--gui` are registered and reserved by `uniopt_schema`, so
+the application must not redeclare them. Install the UniOpt companion command
+and its `share/uniopt/tools` directory if the packaged command offers the GUI.
+
+## Installer layout
+
+For a user installation with `PREFIX=$HOME/.local`, install:
+
+```text
+PREFIX/bin/mytool
+PREFIX/share/mytool/schema.sh
+PREFIX/share/mytool/lib/uniopt.sh
+PREFIX/share/bash-completion/completions/mytool
+```
+
+A minimal Bash 3.2-compatible installer follows this pattern:
+
+```bash
+PREFIX="${PREFIX:-$HOME/.local}"
+DESTDIR="${DESTDIR:-}"
+
+mkdir -p \
+  "$DESTDIR$PREFIX/bin" \
+  "$DESTDIR$PREFIX/share/mytool/lib" \
+  "$DESTDIR$PREFIX/share/bash-completion/completions"
+
+cp bin/mytool "$DESTDIR$PREFIX/bin/mytool"
+cp schema.sh "$DESTDIR$PREFIX/share/mytool/schema.sh"
+cp lib/uniopt.sh "$DESTDIR$PREFIX/share/mytool/lib/uniopt.sh"
+cp completion/mytool.bash \
+  "$DESTDIR$PREFIX/share/bash-completion/completions/mytool"
+```
+
+Vendoring the UniOpt library with the application pins the parser version and
+avoids relying on a machine-wide library search. A system package can instead
+declare UniOpt as a dependency and use its shared installation.
+
+## What “automatic completion” means
+
+The generated file registers a completion function with Bash's `complete`
+builtin. Installing it does not alter an already-running shell. One of these
+must happen:
+
+1. a Bash completion loader scans
+   `PREFIX/share/bash-completion/completions/` when a new shell starts; or
+2. the user sources the installed file from `~/.bash_profile`.
+
+Portable fallback:
+
+```bash
+source "$HOME/.local/share/bash-completion/completions/mytool"
+```
+
+After installation or upgrade, start a new Bash or source the file again.
+Verify registration with:
+
+```bash
+complete -p mytool
+```
+
+On macOS, the login shell may be Zsh. UniOpt currently generates Bash
+completion, so the user must run an interactive Bash and load the Bash
+completion setup. Homebrew's
+[shell completion guide](https://docs.brew.sh/Shell-Completion) explains the
+system-Bash-compatible loader and profile configuration.
+
+## Package-manager integration
+
+- Homebrew formulae should install the generated file with the formula
+  `bash_completion` helper.
+- Debian/RPM packages commonly install command completions in their
+  distribution's Bash-completion directory.
+- Archive installers should prefer the per-user prefix and print the fallback
+  `source` command instead of modifying shell startup files silently.
+
+Test the staged layout using `DESTDIR` before publishing. The UniOpt demo test
+installs into a temporary staging root, executes the installed command, sources
+the installed completion, and exercises enum and option completion.
+---
+
+<!-- Source: docs/installation-and-gui.md -->
+
+# Installation and GUI integration
+
+## Installation strategies
+
+There is no universal package layout for a sourced Bash library. Choose the
+model that matches who controls the application and its deployment.
+
+| Strategy | Best for | Trade-off |
+|---|---|---|
+| Vendor `lib/uniopt.sh` | A script distributed as one repository or archive | Most reproducible; the application owns upgrades and security review |
+| Git submodule/subtree | Several actively developed in-house tools | Preserves upstream history but adds repository workflow overhead |
+| `make install` prefix | Several local programs sharing one installation | Central upgrade; consumers should locate the installed path explicitly |
+| OS/Homebrew package | Organization-wide or public distribution | Best upgrade experience, but needs releases, checksums, packaging metadata, and compatibility policy |
+
+### Vendoring
+
+The recommended first release strategy is to copy a tagged UniOpt
+`lib/uniopt.sh` into the application's own `lib/` directory and source it
+relative to `BASH_SOURCE`. This keeps the program and parser version coupled and
+works without root access or network access at runtime.
+
+### Prefix installation
+
+Install for one user:
+
+```bash
+PREFIX="$HOME/.local" ./scripts/install-uniopt
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+`make install PREFIX="$HOME/.local"` is an equivalent convenience wrapper.
+
+Install system-wide through a package staging root:
+
+```bash
+PREFIX=/usr DESTDIR="$package_root" ./scripts/install-uniopt
+```
+
+The installed layout is:
+
+```text
+PREFIX/bin/uniopt
+PREFIX/share/uniopt/lib/uniopt.sh
+PREFIX/share/uniopt/docs/
+```
+
+`bin/uniopt` discovers both the repository and installed layouts. Set
+`UNIOPT_LIB=/custom/path/uniopt.sh` for an explicit override. Applications
+should generally source the library using a path they control instead of
+depending on a global search.
+
+### Package managers
+
+A future Homebrew formula can install the library under the formula's shared
+data directory, the companion command under `bin`, and generated completion
+under `bash_completion`. These are standard formula path helpers in the
+[Homebrew Formula Cookbook](https://docs.brew.sh/Formula-Cookbook). The formula
+should depend on no newer Bash because UniOpt targets the macOS system Bash.
+
+For Linux packages, place immutable library data under `/usr/share/uniopt` and
+the command under `/usr/bin`, using `DESTDIR` for packaging. Per-user generated
+data should follow `$XDG_DATA_HOME` rather than writing into the installation;
+the [XDG Base Directory specification](https://specifications.freedesktop.org/basedir/0.8/)
+defines the precedence model.
+
+Do not recommend `curl URL | bash` for application startup. Pin a release or
+commit and verify its archive in the packaging or vendoring step.
+
+## Converting a UniOpt program into a GUI
+
+UniOpt includes one backend-neutral line advisor with Tk, Qt, and browser
+frontends. Every schema reserves `--gui`; the application only needs to route
+the resulting built-in action to the generic runner.
+
+The Bash library has no Python dependency. The optional advisor requires
+Python 3.8 or newer. The web backend uses only the standard library. The Tk
+backend additionally requires `tkinter` (often packaged as `python3-tk` on
+Linux). The Qt backend uses the official Qt for Python binding, PySide6:
+
+```bash
+python3 -m venv ~/.local/share/uniopt/gui-venv
+~/.local/share/uniopt/gui-venv/bin/python -m pip install PySide6
+UNIOPT_PYTHON=~/.local/share/uniopt/gui-venv/bin/python \
+  UNIOPT_GUI_BACKEND=qt mytool --gui
+```
+
+PySide6 is an optional frontend dependency; it is not imported by parsing,
+help, completion, Markdown, or JSON generation. On macOS, test Tk with
+`python3 -m tkinter`; Python distributions differ in whether Tk is bundled.
+
+The frontend choices deliberately stay small in number:
+
+| Frontend | Additional runtime | Role |
+|---|---|---|
+| Qt | PySide6 | First desktop choice; polished native widgets and file dialogs |
+| Tk | Python `tkinter` module | Smaller native fallback when Qt is absent |
+| Web | Python standard library and an existing browser | Dependency-light fallback and remote/container use |
+
+Helpers such as Zenity, YAD, AppleScript dialogs, and platform-specific shell
+widgets are not used because they do not provide one consistent dynamic form,
+repeatable-row editor, and argv model across Linux and macOS.
+
+UniOpt's JSON output is an interface description. It does not define a remote
+execution protocol. A GUI adapter uses two separate phases:
+
+```text
+side-effect-free schema file
+          │
+          ├── uniopt json ──> widgets + client-side constraints
+          │
+          └── application <argv elements...> ──> normal parser + domain logic
+```
+
+The GUI must launch a fixed, trusted application with an argument-vector API
+such as Python's `subprocess.run([program, *args], shell=False)`. It must not
+concatenate a command string or pass user input to a shell.
+
+The core schema already provides everything needed to make a correct basic
+form: semantic IDs, types, choices, defaults, repeatability, required fields,
+positionals, remainder arguments, aliases, and constraints. Optional `--ui-*`
+attributes improve presentation without changing CLI semantics:
+
+| Attribute | JSON field | Purpose |
+|---|---|---|
+| `--ui-label TEXT` | `ui.label` | Human-readable field or action label |
+| `--ui-group TEXT` | `ui.group` | Section or tab name |
+| `--ui-control CONTROL` | `ui.control` | Preferred widget |
+| `--ui-placeholder TEXT` | `ui.placeholder` | Empty-field prompt |
+| `--ui-advanced` | `ui.advanced` | Put the field in an advanced area |
+| `--ui-order INTEGER` | `ui.order` | Stable presentation order |
+| `--ui-min VALUE` | `ui.min` | Numeric lower-bound hint |
+| `--ui-max VALUE` | `ui.max` | Numeric upper-bound hint |
+| `--ui-step VALUE` | `ui.step` | Numeric increment hint |
+| `--ui-file-mode MODE` | `ui.file_mode` | `auto`, `open`, `save`, or `directory` chooser |
+
+At schema level, `--ui-confirm TEXT` requests confirmation immediately before
+execution. Native frontends show a dialog and the browser frontend uses a
+confirmation prompt.
+
+Controls are `auto`, `text`, `textarea`, `password`, `number`, `select`,
+`radio`, `checkbox`, `tristate`, `file`, `directory`, `list`, and `hidden`.
+They are advisory. Native frontends use platform file dialogs. The executable
+web advisor provides a server-side path picker for the filesystem in which the
+command will run. A static generated form has text fields only because an HTML
+upload control does not reveal a usable absolute CLI path.
+
+Suggested widget mapping:
+
+| Schema item | GUI control |
+|---|---|
+| `string`, `int`, `uint` | Text or numeric input |
+| `path` | Text input plus native file/directory chooser |
+| `enum` + `choices` | Select or radio group |
+| `boolean` | Checkbox; offer explicit false when `negative_long` exists |
+| `tristate` | Inherit / enabled / disabled selector |
+| `repeatable` | Add/remove list with one argument per row |
+| positional | Ordered required/optional field |
+| remainder | Ordered argument list editor |
+| alias with `sets` | Preset button or checkbox |
+| constraints | Form validation and contextual explanation |
+
+Use the semantic `id` as the widget and persistence key. Treat CLI spellings as
+launch serialization details. This lets a future release rename `--colour` to
+`--color` without invalidating saved GUI state.
+
+### Form behavior
+
+A GUI should follow these rules to preserve the command's behavior:
+
+- Leave untouched fields out of the generated argv. This allows literal,
+  environment, inherited, and callback defaults to keep their CLI provenance.
+- Serialize each repeatable value as a separate option and value pair. Use a
+  row editor rather than splitting a string on whitespace.
+- Serialize positionals in declaration order. Put a literal `--` before the
+  first remainder value so leading hyphens remain data.
+- Preserve empty strings and embedded newlines as individual values when the
+  CLI supports them. The demo uses one textarea row per array element.
+- Map tri-state values to omission for `inherit`, the positive spelling for
+  `true`, and the negative spelling for `false`.
+- Treat an alias as one action spelling. Do not duplicate its `sets` values in
+  argv; the parser applies those assignments and records their provenance.
+- Show constraints early for convenience, then run the real parser and display
+  its diagnostics. Core validation and custom validators remain authoritative.
+- Keep passwords out of previews, logs, browser storage, and process listings
+  when the application handles secrets. A password widget only masks display;
+  it does not make command-line arguments secret.
+
+Static defaults can initialize controls. `dynamic_default` and
+`environment_default` deliberately expose their source rather than executing
+it during introspection. A production GUI has three choices:
+
+1. show those controls as “resolved when run”;
+2. add an application-specific, side-effect-free resolved-default endpoint;
+3. leave them unset and let normal parsing resolve them at launch.
+
+Custom validator function names are Bash implementation details. A generic GUI
+can run normal CLI validation after submission, or an application can publish
+additional portable constraints. Do not attempt to execute validator names in
+the GUI process.
+
+Presentation bounds do not add parser validation. If `--ui-min 1` is important
+to correctness, also declare a type or custom validator that enforces it. This
+ensures terminal, GUI, and automated callers receive the same result.
+
+## Run the demo GUI
+
+From the repository root:
+
+```bash
+./examples/uniopt-demo/uniopt-demo --gui
+```
+
+On a desktop, `auto` silently uses Qt when available, then Tk. If neither native
+backend can open a display, it starts a loopback web server and prints its URL.
+No GUI toolkit is installed or required by the core package. Force a
+frontend when testing:
+
+```bash
+UNIOPT_GUI_BACKEND=tk ./examples/uniopt-demo/uniopt-demo --gui
+UNIOPT_GUI_BACKEND=qt ./examples/uniopt-demo/uniopt-demo --gui
+UNIOPT_GUI_BACKEND=web UNIOPT_GUI_OPEN=1 \
+  ./examples/uniopt-demo/uniopt-demo --gui
+```
+
+Python 3 is required for the advisor. Tk is commonly packaged as `python3-tk`.
+The Qt backend uses PySide6 and is optional. Tk uses Python's optional
+`tkinter` module. The browser backend uses only the Python standard library and
+is the smallest guaranteed fallback.
+
+### Running inside WISE or another container
+
+Container loopback is separate from host loopback. `--open` cannot make an
+unforwarded container port reachable from the host browser. Start the GUI on a
+known port instead:
+
+```bash
+UNIOPT_GUI_BACKEND=web UNIOPT_GUI_PORT=8765 \
+  ./examples/uniopt-demo/uniopt-demo --gui
+```
+
+Then forward container port `8765` in WISE's **Ports** view and select **Open in
+Browser** for the forwarded address. The server provides the form at `/`, and
+the form posts to a same-origin relative path. It therefore works if the host
+side uses a different port. Keep the GUI process running while using the page.
+
+The same rule applies to SSH and other container environments: establish a
+loopback tunnel or IDE port forward first, then visit its host-side URL. The
+demo deliberately binds only container loopback; it does not expose an
+unauthenticated development runner on every container interface.
+
+The command line preview updates immediately whenever a control changes. The
+only execution button is **Run**. Run first invokes the schema parser in
+validation-only mode; parser diagnostics are shown instead of launching the
+program when validation fails.
+
+The server uses an unguessable URL for the current run, accepts JSON only, and
+can invoke only the executable fixed by the launcher. It passes arguments as
+an array with `shell=False` and displays stdout, stderr, and exit status. A
+deployed web application still needs its normal authentication, authorization,
+input-size, working-directory, environment, and resource policies.
+
+The web path picker browses the command runner's filesystem. In WISE this means
+container paths, even when the page is displayed by a host browser. This is
+intentional: a host path that is not mounted in the container cannot be passed
+meaningfully to the container command.
+
+The demo schema shows presentation hints directly:
+
+```bash
+uniopt_option runtime.jobs \
+  --short -j --long --jobs --dest JOBS --type uint --default 1 \
+  --validator uniopt_demo_positive --metavar N \
+  --help "Positive worker count" \
+  --ui-label "Worker count" --ui-group Runtime --ui-control number \
+  --ui-order 10 --ui-min 1 --ui-max 32 --ui-step 1
+```
+
+`uniopt_demo_positive` remains the real validation. The other attributes tell
+the GUI how to present the same option.
+
+## Generate a static form
+
+The repository includes a small dependency-free converter:
+
+```bash
+scripts/generate-docs
+tools/uniopt-json-to-html docs/generated/uniopt-demo.schema.json >demo.html
+```
+
+It renders the same grouped form and previews the exact argument vector but has
+no Run button. The generated page has no external dependencies. To connect it
+to an application service, supply a JSON POST endpoint that accepts
+`{"args":[...]}`:
+
+```bash
+tools/uniopt-json-to-html \
+  --submit-url http://127.0.0.1:8080/run \
+  docs/generated/uniopt-demo.schema.json >demo.html
+```
+
+The endpoint option only changes the page; the converter does not create or
+secure a server. The demo runner is the reference for the expected response:
+`{"status": 0, "stdout": "...", "stderr": "..."}`.
+
+## Choosing an application architecture
+
+For a local desktop tool, generate widgets from JSON and invoke the CLI as a
+child process. This naturally preserves local paths and the user's environment.
+For a hosted web GUI, treat the CLI as a backend job: define which executable
+and working directory are allowed, translate uploaded files to controlled
+server paths, isolate jobs, stream or capture output, and return parser errors
+to the corresponding semantic IDs. A static form alone must never be allowed
+to choose an arbitrary executable.
+---
+
+<!-- Source: docs/gui-design.md -->
+
+# GUI line-advisor design
+
+Status: implemented prototype contract.
+
+## Product goal
+
+Any program with a side-effect-free UniOpt schema should be able to open an
+interactive **line advisor**. The advisor renders the options, shows the exact
+argument vector and a copyable shell representation, validates it, and runs the
+fixed program when the user selects **Run**.
+
+The GUI is an adapter over the CLI. The CLI remains the authoritative public
+interface and the application receives the same argv it would receive from a
+terminal. There is no second application API and no conversion of arguments to
+a whitespace-delimited command string.
+
+```text
+schema ──> controls ──> argv array ──> schema validation ──> fixed executable
+             │              │                                  │
+             └──── visible line advisor ────────────────────────┘
+```
+
+## Recommended entry points
+
+The generic runner is the primary interface:
+
+```text
+UNIOPT_GUI_BACKEND=auto \
+  uniopt gui SCHEMA_FILE SCHEMA_FUNCTION -- PROGRAM [FIXED_ARG...]
+```
+
+Separating `PROGRAM` from the schema is deliberate. JSON describes an
+interface; it must not authorize an arbitrary executable. The runner resolves
+and fixes the program before showing the window, appends only argv elements
+created by the form, and invokes it without a shell.
+
+Every schema receives reserved `-h`/`--help` and `--gui` controls. Applications
+handle the selected action immediately after parsing:
+
+```bash
+mytool_schema || exit 2
+uniopt_parse "$@" || exit 2
+if [[ "$UNIOPT_ACTION" == help ]]; then
+  uniopt_help
+  exit 0
+fi
+if [[ "$UNIOPT_ACTION" == gui ]]; then
+  exec uniopt gui "$SCHEMA_FILE" mytool_schema -- "$0"
+fi
+```
+
+Required options and positionals do not prevent either built-in action. UniOpt
+forbids application declarations from reusing `-h`, `--help`, or `--gui`, so
+help, completion, and JSON always describe the same control interface.
+
+## Backend model
+
+The runner supports `auto`, `tk`, `qt`, and `web` behind one model and argv
+serializer. Set `UNIOPT_GUI_BACKEND` when an explicit choice is needed.
+
+### Native Tk backend
+
+The Tk frontend uses Python `tkinter` and themed `ttk`
+widgets. Tk provides real desktop windows, native file/directory dialogs, no
+HTTP listener, and direct subprocess execution. It is a reasonable reference
+backend because it commonly ships with Python and works on Linux and macOS.
+
+It is still an optional dependency. Some Linux distributions split Tk into a
+separate package, and the current WISE image has Python without `tkinter`.
+Running `python3 -m tkinter` is the installation check. A GUI launched inside a
+container also needs a working X11/Wayland display path; it does not
+automatically become a host-native application.
+
+### Browser backend
+
+The existing HTML renderer remains the portability fallback. It works where Tk
+is unavailable and is suitable for remote systems, but command execution needs
+a short-lived local backend and, inside WISE, port forwarding. It uses
+the same schema model, serializer, validation flow, and fixed executable as the
+native backend.
+
+### Qt desktop backend
+
+The Qt for Python frontend provides the same controls and native file dialogs.
+It is useful where Qt is already packaged or when a signed application bundle
+is wanted, but it brings a substantially larger runtime and requires modern
+Python. It remains optional and is never a dependency of the Bash library.
+
+`auto` selects Qt after importing it and confirming a display is available,
+then tries Tk, and otherwise starts the browser backend. Detection is silent;
+the web server prints
+its loopback URL; set `UNIOPT_GUI_OPEN=1` only when the browser shares its
+network namespace. Backend selection does not change argv semantics.
+
+## Advisor behavior
+
+The window should contain:
+
+1. a title and command summary;
+2. grouped basic and advanced controls;
+3. add/remove row editors for repeatable and remainder values;
+4. a copyable shell-quoted command line that updates after every edit and is
+   labeled as display-only;
+5. **Run** and **Close** actions;
+6. exit status, stdout, and stderr panes after execution.
+
+The subprocess must run asynchronously so its output does not freeze the
+window. Version one may capture output at completion; streaming can follow.
+Captured results appear after completion; streaming output and cancellation are
+future additions.
+
+Untouched controls are omitted from argv so literal, environment, inherited,
+and callback defaults retain their provenance. Required means an argument must
+be present; it does not mean a nonempty string. The advisor must therefore
+distinguish “not supplied” from “supplied as empty.” Array rows naturally make
+that distinction, and scalar controls need an explicit include/reset state.
+
+Tri-state values serialize as omission for `inherit`, the positive spelling
+for `true`, and the negative spelling for `false`. Remainder arguments always
+follow `--`. Presets emit their alias spelling instead of reproducing their
+assignments.
+
+## Validation before execution
+
+The companion command provides a parser-only mode:
+
+```text
+uniopt validate SCHEMA_FILE SCHEMA_FUNCTION -- ARG...
+```
+
+The advisor runs this automatically when **Run** is selected. There is no
+separate validation button. The check covers types, required values, aliases,
+constraints, dynamic defaults, environment defaults, and Bash custom
+validators without running application domain logic. If it succeeds, the
+advisor launches `PROGRAM` with the same argv array. The application parses
+again and remains authoritative, which protects callers that bypass the GUI.
+
+A later machine-readable diagnostic format can associate errors with semantic
+IDs. The first implementation can display the parser's existing stderr.
+
+## Execution contract
+
+The runner records these values before opening the interface:
+
+- canonical executable path and fixed leading arguments;
+- schema file and function;
+- working directory, defaulting to the directory where the advisor was
+  launched;
+- inherited environment, with optional application-controlled additions;
+- timeout and output limits supplied by the embedding application or runner.
+
+It never accepts an executable name from schema JSON or a browser request. It
+uses an argv subprocess API with shell execution disabled. The shell-quoted
+preview is only for human inspection and clipboard use.
+
+Pressing **Run** is the execution authorization. Commands that remove data or
+perform another material action may declare a confirmation message; the GUI
+shows it immediately before launch. The CLI itself must retain its own safety
+checks.
+
+## Presentation metadata
+
+The current `--ui-label`, `--ui-group`, `--ui-control`, `--ui-placeholder`,
+`--ui-advanced`, `--ui-order`, `--ui-min`, `--ui-max`, and `--ui-step` hints
+cover the initial control layout. Two additions are justified by native
+execution:
+
+| Attribute | Scope | Meaning |
+|---|---|---|
+| `--ui-file-mode auto|open|save|directory` | path option or positional | Choose the native path dialog |
+| `--ui-confirm TEXT` | schema | Ask for confirmation before executing this command |
+
+File extensions and MIME filters, conditional visibility, richer descriptions,
+and layout columns should wait for concrete application requirements. UI bounds
+remain presentation hints; parser types and validators enforce correctness.
+
+The web frontend can browse the filesystem visible to the command runner. Its
+picker lists server-side paths through the token-protected loopback endpoint;
+it does not use an HTML upload control, because browsers do not reveal a local
+absolute path. Inside a container, the picker therefore shows container paths,
+which are the paths the launched command can actually use.
+
+## Container and host placement
+
+For host-side WISE launcher commands, run the native advisor on the host and
+let it launch the host script. For commands inside WISE, there are three valid
+deployments:
+
+1. run Tk inside WISE through its configured display forwarding;
+2. run the browser backend inside WISE through an IDE/SSH port forward;
+3. run a host advisor connected to a narrowly defined WISE execution bridge.
+
+The third option needs a separate authenticated protocol and is outside the
+generic UniOpt runner. A native toolkit alone does not solve container-to-host
+execution or display transport.
+
+The standalone prototype implements the shared model, validation command, Tk,
+Qt, and web frontends, the demo hook, and integration-preview hooks. Adoption
+inside WISE and ContainerXP remains a separate integration step after the
+example twins have been exercised.
+---
+
+<!-- Source: docs/bash-3.2-compatibility.md -->
+
+# Bash 3.2 compatibility policy
+
+UniOpt supports Bash 3.2 and later. Bash semantics remain part of the API; this
+is not a POSIX `sh` library.
+
+## Result API migration
+
+The Bash 4.3 prototype assigned repeatable and remainder values to caller-named
+arrays and implemented `uniopt_values ID OUTPUT_ARRAY` with `local -n`. Bash
+3.2 has no namerefs and cannot safely initialize and populate an arbitrary
+caller-named empty array without constructing shell code.
+
+The portable API keeps multi-values in indexed records:
+
+```bash
+uniopt_parse "$@" || exit 2
+uniopt_get_all compose.extra
+extra_compose=("${UNIOPT_RESULT[@]}")
+
+uniopt_get_unknown
+compose_passthrough=("${UNIOPT_RESULT[@]}")
+```
+
+`UNIOPT_RESULT` is replaced by each multi-value getter. Values are copied
+element by element internally, so spaces, empty strings, wildcard characters,
+backslashes, Unicode, and newlines retain their argument boundaries.
+
+Scalar `--dest` assignment remains supported. `uniopt_get` and
+`uniopt_get_source` are the preferred scalar accessors; `uniopt_value` and
+`uniopt_provenance` remain aliases. The second argument formerly accepted by
+`uniopt_values` is rejected with an explicit diagnostic.
+
+## Internal model
+
+Semantic option IDs map to stable numeric indexes in parallel indexed arrays.
+Separate indexed tables hold spellings, enum choices, alias assignments,
+constraint members, and repeated result values. Lookups use explicit loops.
+The core contains no associative arrays, namerefs, case-conversion expansion,
+dynamic evaluation, generated parser scripts, or whitespace serialization of
+argument arrays.
+
+## Verification
+
+CI has three independent jobs:
+
+- Ubuntu with its current Bash;
+- Ubuntu with GNU Bash 3.2 plus all 57 official patches, downloaded from GNU,
+  checksum-verified, built locally, and asserted as version 3.2.57;
+- macOS with `/bin/bash`, asserted to have major/minor version 3.2.
+
+Every job syntax-checks the library, executable, examples, tests, and CI shell
+scripts with its selected interpreter, runs the forbidden-feature audit, and
+runs the complete behavior suite.
+
+## Platform differences
+
+GNU Bash 3.2.57 on Linux verifies the shell-language baseline. The macOS job
+also covers Apple's system interpreter and standard command environment. It
+does not exercise future WISE or ContainerXP Docker integration, filesystem
+path normalization, case-insensitive filesystems, GUI launching, or other
+application behavior because those projects are outside this compatibility
+layer. Those are platform-integration concerns rather than shell-version
+differences.
+---
+
+<!-- Source: docs/test-coverage.md -->
+
+# Test and CI coverage
+
+`tests/all.sh` is the authoritative local and CI entry point. The GitHub Actions
+workflow runs it with the runner's current Bash, a source-built checksum-pinned
+GNU Bash 3.2.57, and macOS `/bin/bash` after asserting that the latter is 3.2.
+
+| Contract | Coverage |
+|---|---|
+| Bash 3.2 syntax | Every library, executable, schema, generator, installer, and test is checked with the active matrix interpreter |
+| Forbidden Bash 4+ features | `tests/forbidden-features.sh` scans runtime Bash sources for associative arrays, namerefs, `mapfile`, case conversion, `[[ -v ]]`, `eval`, and related syntax |
+| Parser forms and failures | `tests/extended.sh` covers long, equals, short, boolean, tri-state, aliases, arrays, positionals, unknown policies, missing values, duplicates, required fields, types, validators, and constraints |
+| Exact argv integrity | `tests/run.sh`, `tests/extended.sh`, and `tests/integration-preview.sh` compare arrays element by element, including empty, whitespace, metacharacter, Unicode, newline, and post-`--` values |
+| Defaults and provenance | Literal, inherited, environment, callback, alias, positional, and explicit sources are asserted |
+| Generated interfaces | Determinism, JSON parsing, completion syntax/content, terminal help, Markdown, GUI metadata, and HTML conversion are tested |
+| Side-effect-free introspection | Fixture markers prove that schema export exits before application logic and dynamic defaults run only during parsing |
+| Error behavior and shell modes | Status 2, option-specific diagnostics, nounset cleanliness, and representative `set -e` handling are asserted |
+| Filesystem and concurrency safety | Parallel parser processes run without shared parser files; static audit rejects `eval` and generated parser code |
+| Installation and completion | The demo is staged under a temporary prefix and its installed command and completion are exercised |
+| GUI adapter | The shared model is tested element by element for empty, multiline, metacharacter, Unicode, store-constant, positional, and remainder values; validation, Basic/Advanced classification, conditional labels, file modes, static HTML, and the demo hook are checked |
+| WISE/ContainerXP migration surface | Nine command twins test shared options, aliases, compound actions, passthrough, required input, legacy defaults, completion, JSON, and GUI forms |
+| Documentation synchronization | Generated snapshots, all public functions/attributes, and every repository-local Markdown link are checked |
+
+## Residual platform coverage
+
+Linux execution under GNU Bash 3.2 proves language compatibility but does not
+model every macOS utility difference. The macOS runner covers the complete
+behavioral suite with system Bash. Browser opening, WISE port-forward UI,
+Docker availability, native file chooser interaction, and package-manager
+installation are environment integrations and are documented but not automated
+in this library CI. The frontend modules are covered through their shared model;
+interactive Tk/Qt window tests remain platform packaging checks.
+
+The integration previews are pinned to a documented local source snapshot.
+CI cannot detect future WISE or ContainerXP CLI drift because those repositories
+are intentionally not fetched or modified. Updating the snapshot requires a
+new manual comparison and corresponding schema/test changes.

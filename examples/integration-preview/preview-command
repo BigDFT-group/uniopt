@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+set -u
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(cd "$HERE/../.." && pwd)"
+source "$ROOT/lib/uniopt.sh"
+source "$HERE/schemas.sh"
+
+COMMAND="${1-}"
+[[ -n "$COMMAND" ]] || { printf 'usage: preview-command COMMAND [ARG...]\n' >&2; exit 2; }
+shift
+UNIOPT_PREVIEW_COMMAND="$COMMAND"
+export UNIOPT_PREVIEW_COMMAND
+integration_preview_schema || exit
+
+uniopt_parse "$@" || exit
+if [[ "$UNIOPT_ACTION" == help ]]; then uniopt_help; exit 0; fi
+if [[ "$UNIOPT_ACTION" == gui ]]; then
+  exec "$ROOT/bin/uniopt" gui "$HERE/schemas.sh" integration_preview_schema -- "$HERE/bin/$COMMAND"
+fi
+
+is_multi() {
+  local sought="$1" member
+  for member in "${PREVIEW_MULTI_IDS[@]}"; do [[ "$member" == "$sought" ]] && return 0; done
+  return 1
+}
+
+printf 'preview.command=%q\n' "$COMMAND"
+for id in "${PREVIEW_IDS[@]}"; do
+  if is_multi "$id"; then
+    uniopt_get_all "$id" || exit
+    i=0
+    while (( i < ${#UNIOPT_RESULT[@]} )); do printf '%s[%d]=%q\n' "$id" "$i" "${UNIOPT_RESULT[$i]}"; i=$((i + 1)); done
+  else
+    value=""; uniopt_get "$id" value || exit
+    printf '%s=%q source=%q\n' "$id" "$value" "$(uniopt_get_source "$id")"
+  fi
+done
+if (( PREVIEW_HAS_UNKNOWN )); then
+  uniopt_get_unknown
+  i=0
+  while (( i < ${#UNIOPT_RESULT[@]} )); do printf 'passthrough[%d]=%q\n' "$i" "${UNIOPT_RESULT[$i]}"; i=$((i + 1)); done
+fi

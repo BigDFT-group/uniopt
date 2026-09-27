@@ -1,0 +1,53 @@
+#!/usr/bin/env python3
+"""Launch or check the generic UniOpt advisor with the demo schema."""
+
+import argparse
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+
+sys.dont_write_bytecode = True
+HERE = Path(__file__).resolve().parent
+ROOT = HERE.parents[1]
+
+
+def schema():
+    completed = subprocess.run(
+        [str(ROOT / "bin" / "uniopt"), "json", str(HERE / "schema.sh"), "uniopt_demo_schema"],
+        check=True, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    )
+    return json.loads(completed.stdout)
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--backend", choices=("auto", "tk", "qt", "web"), default="auto")
+    parser.add_argument("--port", type=int, default=0)
+    parser.add_argument("--open", action="store_true")
+    parser.add_argument("--check", action="store_true")
+    args = parser.parse_args()
+    if args.check:
+        sys.path.insert(0, str(ROOT / "tools"))
+        from uniopt_gui import AdvisorModel
+        model = AdvisorModel(schema())
+        assert model.schema["command"] == "uniopt-demo"
+        assert "greeting.recipient" in model.states
+        print("uniopt-demo GUI check passed")
+        return 0
+    environment = os.environ.copy()
+    environment["UNIOPT_GUI_BACKEND"] = args.backend
+    environment["UNIOPT_GUI_PORT"] = str(args.port)
+    if args.open:
+        environment["UNIOPT_GUI_OPEN"] = "1"
+    os.execve(
+        str(ROOT / "bin" / "uniopt"),
+        [str(ROOT / "bin" / "uniopt"), "gui", str(HERE / "schema.sh"),
+         "uniopt_demo_schema", "--", str(HERE / "uniopt-demo")],
+        environment,
+    )
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

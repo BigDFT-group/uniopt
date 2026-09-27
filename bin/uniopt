@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+if [[ -n "${UNIOPT_LIB:-}" ]]; then
+  UNIOPT_LIBRARY="$UNIOPT_LIB"
+elif [[ -r "$ROOT_DIR/lib/uniopt.sh" ]]; then
+  UNIOPT_LIBRARY="$ROOT_DIR/lib/uniopt.sh"
+elif [[ -r "$ROOT_DIR/share/uniopt/lib/uniopt.sh" ]]; then
+  UNIOPT_LIBRARY="$ROOT_DIR/share/uniopt/lib/uniopt.sh"
+else
+  printf 'uniopt: cannot find lib/uniopt.sh; set UNIOPT_LIB to its path\n' >&2
+  exit 2
+fi
+# shellcheck source=../lib/uniopt.sh
+source "$UNIOPT_LIBRARY"
+
+usage() {
+  cat >&2 <<'EOF'
+Usage:
+  uniopt {help|markdown|json|completion} SCHEMA_FILE [SCHEMA_FUNCTION]
+  uniopt validate SCHEMA_FILE SCHEMA_FUNCTION -- [ARG...]
+  uniopt gui SCHEMA_FILE SCHEMA_FUNCTION -- PROGRAM [FIXED_ARG...]
+EOF
+}
+
+(( $# >= 2 )) || { usage; exit 2; }
+format="$1"
+schema_file="$2"
+shift 2
+schema_function=""
+
+case "$format" in
+  help|markdown|json|completion)
+    (( $# <= 1 )) || { usage; exit 2; }
+    schema_function="${1-}"
+    ;;
+  validate|gui)
+    (( $# >= 2 )) || { usage; exit 2; }
+    schema_function="$1"
+    shift
+    [[ "$1" == -- ]] || { usage; exit 2; }
+    shift
+    ;;
+  *) usage; exit 2 ;;
+esac
+
+[[ -r "$schema_file" ]] || { printf 'uniopt: cannot read schema: %s\n' "$schema_file" >&2; exit 2; }
+# A schema file is trusted application code. Rendering itself does not resolve
+# dynamic defaults or invoke validators.
+# shellcheck disable=SC1090
+UNIOPT_INTROSPECT=1
+source "$schema_file"
+if [[ -n "$schema_function" ]]; then
+  declare -F "$schema_function" >/dev/null || { printf 'uniopt: schema function not found: %s\n' "$schema_function" >&2; exit 2; }
+  "$schema_function"
+fi
+
+case "$format" in
+  help) uniopt_help ;;
+  markdown) uniopt_markdown ;;
+  json) uniopt_json ;;
+  completion) uniopt_completion ;;
+  validate) uniopt_parse "$@" ;;
+  gui)
+    (( $# )) || { printf 'uniopt: gui requires PROGRAM after --\n' >&2; exit 2; }
+    if [[ -r "$ROOT_DIR/tools/uniopt-gui" ]]; then
+      gui_runner="$ROOT_DIR/tools/uniopt-gui"
+    elif [[ -r "$ROOT_DIR/share/uniopt/tools/uniopt-gui" ]]; then
+      gui_runner="$ROOT_DIR/share/uniopt/tools/uniopt-gui"
+    else
+      printf 'uniopt: cannot find the GUI advisor runner\n' >&2
+      exit 2
+    fi
+    gui_arguments=(--backend "${UNIOPT_GUI_BACKEND:-auto}" --port "${UNIOPT_GUI_PORT:-0}" \
+      --uniopt-bin "$0" --schema "$schema_file" --function "$schema_function")
+    case "${UNIOPT_GUI_OPEN:-}" in 1|true|yes) gui_arguments+=(--open) ;; esac
+    exec "${UNIOPT_PYTHON:-python3}" "$gui_runner" "${gui_arguments[@]}" -- "$@"
+    ;;
+esac

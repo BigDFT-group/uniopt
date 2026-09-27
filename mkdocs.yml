@@ -1,0 +1,46 @@
+site_name: UniOpt
+site_description: Declarative command-line schemas for Bash 3.2 and newer
+site_url: https://bigdft-group.github.io/uniopt/
+repo_url: https://github.com/bigdft-group/uniopt
+repo_name: bigdft-group/uniopt
+docs_dir: docs
+exclude_docs: |
+  README.md
+  api.md
+strict: true
+theme:
+  name: readthedocs
+plugins:
+  - search
+markdown_extensions:
+  - admonition
+  - attr_list
+  - tables
+  - toc:
+      permalink: true
+nav:
+  - Home: index.md
+  - User guide: user-guide.md
+  - Public API: api-reference.md
+  - Install and distribute:
+      - Installation and GUI: installation-and-gui.md
+      - Distributing a script: distributing-a-script.md
+  - GUI advisor: gui-design.md
+  - Generated examples:
+      - UniOpt demo: generated/uniopt-demo.md
+      - WISE environment: generated/integration-preview/wise-env.md
+      - WISE up: generated/integration-preview/wise-up.md
+      - WISE down: generated/integration-preview/wise-down.md
+      - WISE shell: generated/integration-preview/wise-shell.md
+      - WISE host opener: generated/integration-preview/wise-host-open.md
+      - Dockerfile converter: generated/integration-preview/dockerfile-to-wise-sdk.md
+      - BigDFT builder: generated/integration-preview/bigdftmk.md
+      - LARA builder: generated/integration-preview/laramk.md
+      - LaTeX builder: generated/integration-preview/latexmk.md
+  - Compatibility:
+      - Bash 3.2 policy: bash-3.2-compatibility.md
+      - Compatibility audit: bash-3.2-audit.md
+  - Integration previews: integration-reference-audit.md
+  - Test coverage: test-coverage.md
+  - Contributing: contributing.md
+  - Releasing: releasing.md
