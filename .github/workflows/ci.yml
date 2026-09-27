@@ -13,6 +13,7 @@ jobs:
         with:
           python-version: "3.x"
           cache: pip
+          cache-dependency-path: requirements-docs.txt
       - run: python -m pip install -r requirements-docs.txt
       - run: ./scripts/check-docs
       - run: mkdocs build --strict
@@ -36,7 +37,8 @@ jobs:
       - name: Build pinned Bash 3.2.57
         run: bash ci/build-bash-3.2.sh "$RUNNER_TEMP/bash-3.2"
       - name: Test and syntax-check with Bash 3.2.57
-        run: "$RUNNER_TEMP/bash-3.2/bin/bash" tests/all.sh
+        run: |
+          "$RUNNER_TEMP/bash-3.2/bin/bash" tests/all.sh
 
   macos-system-bash:
     runs-on: macos-latest
