@@ -1,19 +1,22 @@
-# `wise-shell`
+# `wise-shell` GUI preview
 
-Run a command in the WISE container
+This interactive command-line advisor is generated from the same UniOpt schema
+used by the preview command. Change fields to see the exact command update
+immediately. Basic and advanced options, repeatable values, paths, choices,
+tri-state values, positionals, and constraints are presented from schema
+metadata.
 
-## Options
+<iframe
+  src="../wise-shell.gui.html"
+  title="wise-shell UniOpt GUI preview"
+  style="width: 100%; height: 52rem; border: 1px solid #aeb8c2; border-radius: .4rem; background: white;"
+></iframe>
 
-| Option | Type | Default | Description |
-|---|---|---|---|
-| `-h, --help` | `boolean` | `false` | Show help and exit |
-| `--gui` | `boolean` | `false` | Open the graphical command-line advisor |
-| `--env-file PATH` | `path` | `` | Env file to use |
-| `--name NAME` | `string` | `` | Select a named WISE session |
-| `--extra-compose PATH` | `path` | `` | Add an extra Docker Compose file |
+[Open the wise-shell advisor in a full browser page](wise-shell.gui.html)
 
-## Arguments
+!!! note "Static demonstration"
 
-| Argument | Type | Required | Description |
-|---|---|---|---|
-| `COMMAND...` | `string` | no | Command and exact arguments |
+    This hosted advisor builds a command line but does not execute it or browse
+    the server filesystem. Install UniOpt and run
+    `examples/integration-preview/bin/wise-shell --gui` for the complete local
+    advisor with **Run** and path browsing.

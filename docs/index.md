@@ -12,6 +12,8 @@ advisor while preserving exact argument boundaries.
   declaration attribute.
 - Run the [demo](https://github.com/bigdft-group/uniopt/tree/main/examples/uniopt-demo)
   to exercise completion and the GUI advisor.
+- Explore the [interactive GUI examples](generated/uniopt-demo.md) to change
+  schema-driven controls and watch each command line update in the browser.
 - Read [installation and GUI integration](installation-and-gui.md) when
   packaging a command or selecting Qt, Tk, or web presentation.
 

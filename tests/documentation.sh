@@ -33,6 +33,11 @@ grep -Fq 'http://127.0.0.1/browse' "$html_file" || failures=$((failures + 1))
 grep -Fq 'Browse…' "$html_file" || failures=$((failures + 1))
 rm -f "$html_file"
 
+grep -Fq '<iframe' "$ROOT_DIR/docs/generated/uniopt-demo.md" || failures=$((failures + 1))
+grep -Fq 'uniopt-demo.gui.html' "$ROOT_DIR/docs/generated/uniopt-demo.md" || failures=$((failures + 1))
+grep -Fq 'src="../uniopt-demo.gui.html"' "$ROOT_DIR/docs/generated/uniopt-demo.md" || failures=$((failures + 1))
+grep -Fq 'const schema=' "$ROOT_DIR/docs/generated/uniopt-demo.gui.html" || failures=$((failures + 1))
+
 python3 "$ROOT_DIR/examples/uniopt-demo/gui" --check >/dev/null || failures=$((failures + 1))
 python3 - "$ROOT_DIR/docs/generated/uniopt-demo.schema.json" <<'PY' || failures=$((failures + 1))
 import json

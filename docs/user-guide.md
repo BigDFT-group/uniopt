@@ -41,7 +41,10 @@ For larger, real-world interfaces, the
 [WISE and ContainerXP integration previews](https://github.com/bigdft-group/uniopt/tree/main/examples/integration-preview)
 provide nine side-effect-free command twins. They show the schema and packaging
 work required to add completion and GUI forms before either application is
-migrated.
+migrated. The documentation site presents each schema as an
+[interactive GUI advisor](generated/integration-preview/wise-env.md), so users
+can explore the controls and generated command lines without installing or
+running the reference applications.
 
 ## Structure your program
 

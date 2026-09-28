@@ -1,20 +1,22 @@
-# `dockerfile-to-wise-sdk`
+# `dockerfile-to-wise-sdk` GUI preview
 
-Convert a Dockerfile into WISE runtime installation files
+This interactive command-line advisor is generated from the same UniOpt schema
+used by the preview command. Change fields to see the exact command update
+immediately. Basic and advanced options, repeatable values, paths, choices,
+tri-state values, positionals, and constraints are presented from schema
+metadata.
 
-## Options
+<iframe
+  src="../dockerfile-to-wise-sdk.gui.html"
+  title="dockerfile-to-wise-sdk UniOpt GUI preview"
+  style="width: 100%; height: 52rem; border: 1px solid #aeb8c2; border-radius: .4rem; background: white;"
+></iframe>
 
-| Option | Type | Default | Description |
-|---|---|---|---|
-| `-h, --help` | `boolean` | `false` | Show help and exit |
-| `--gui` | `boolean` | `false` | Open the graphical command-line advisor |
-| `--output-dir PATH` | `path` | `` | Directory for generated files |
-| `--script-name NAME` | `string` | `install-sdk.sh` | Generated installer filename |
-| `--env-name NAME` | `string` | `wise.extra.env` | Generated environment filename |
-| `--warnings-name NAME` | `string` | `conversion-warnings.txt` | Generated warnings filename |
+[Open the dockerfile-to-wise-sdk advisor in a full browser page](dockerfile-to-wise-sdk.gui.html)
 
-## Arguments
+!!! note "Static demonstration"
 
-| Argument | Type | Required | Description |
-|---|---|---|---|
-| `DOCKERFILE` | `path` | yes | Input Dockerfile |
+    This hosted advisor builds a command line but does not execute it or browse
+    the server filesystem. Install UniOpt and run
+    `examples/integration-preview/bin/dockerfile-to-wise-sdk --gui` for the complete local
+    advisor with **Run** and path browsing.

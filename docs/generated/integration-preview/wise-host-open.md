@@ -1,24 +1,22 @@
-# `wise-host-open`
+# `wise-host-open` GUI preview
 
-Run or contact the WISE host opener bridge
+This interactive command-line advisor is generated from the same UniOpt schema
+used by the preview command. Change fields to see the exact command update
+immediately. Basic and advanced options, repeatable values, paths, choices,
+tri-state values, positionals, and constraints are presented from schema
+metadata.
 
-## Options
+<iframe
+  src="../wise-host-open.gui.html"
+  title="wise-host-open UniOpt GUI preview"
+  style="width: 100%; height: 52rem; border: 1px solid #aeb8c2; border-radius: .4rem; background: white;"
+></iframe>
 
-| Option | Type | Default | Description |
-|---|---|---|---|
-| `-h, --help` | `boolean` | `false` | Show help and exit |
-| `--gui` | `boolean` | `false` | Open the graphical command-line advisor |
-| `--env-file PATH` | `path` | `` | Env file to use |
-| `--name NAME` | `string` | `` | Select a named WISE session |
-| `--socket PATH` | `path` | `` | Override the host-open socket path |
-| `--open-command CMD` | `string` | `` | Host opener command |
-| `--once` | `boolean` | `false` | Serve one request and exit |
-| `--test-mode` | `boolean` | `false` | Print accepted targets instead of opening |
-| `--daemon` | `boolean` | `false` | Start a managed bridge |
-| `--stop` | `boolean` | `false` | Stop the managed bridge |
-| `--client URL` | `string` | `` | Send a URL to the bridge |
-| `--client-file PATH` | `path` | `` | Send a PDF or DOCX path |
+[Open the wise-host-open advisor in a full browser page](wise-host-open.gui.html)
 
-## Constraints
+!!! note "Static demonstration"
 
-- `mutex`: `action.daemon` `action.stop` `action.client` `action.client_file`
+    This hosted advisor builds a command line but does not execute it or browse
+    the server filesystem. Install UniOpt and run
+    `examples/integration-preview/bin/wise-host-open --gui` for the complete local
+    advisor with **Run** and path browsing.

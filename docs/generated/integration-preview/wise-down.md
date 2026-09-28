@@ -1,16 +1,22 @@
-# `wise-down`
+# `wise-down` GUI preview
 
-Stop a WISE session
+This interactive command-line advisor is generated from the same UniOpt schema
+used by the preview command. Change fields to see the exact command update
+immediately. Basic and advanced options, repeatable values, paths, choices,
+tri-state values, positionals, and constraints are presented from schema
+metadata.
 
-## Options
+<iframe
+  src="../wise-down.gui.html"
+  title="wise-down UniOpt GUI preview"
+  style="width: 100%; height: 52rem; border: 1px solid #aeb8c2; border-radius: .4rem; background: white;"
+></iframe>
 
-| Option | Type | Default | Description |
-|---|---|---|---|
-| `-h, --help` | `boolean` | `false` | Show help and exit |
-| `--gui` | `boolean` | `false` | Open the graphical command-line advisor |
-| `--env-file PATH` | `path` | `` | Env file to use |
-| `--name NAME` | `string` | `` | Select a named WISE session |
-| `--extra-compose PATH` | `path` | `` | Add an extra Docker Compose file |
-| `--prune-inner-containers` | `boolean` | `false` | Prune inner images, networks, and build cache |
-| `--prune-inner-container-volumes` | `action` | `` | Also prune inner Docker volumes |
-| `--remove-inner-container-volume` | `boolean` | `false` | Remove the shared sidecar data volume |
+[Open the wise-down advisor in a full browser page](wise-down.gui.html)
+
+!!! note "Static demonstration"
+
+    This hosted advisor builds a command line but does not execute it or browse
+    the server filesystem. Install UniOpt and run
+    `examples/integration-preview/bin/wise-down --gui` for the complete local
+    advisor with **Run** and path browsing.

@@ -68,5 +68,9 @@ done
 html="$($ROOT_DIR/examples/integration-preview/render gui wise-env)"
 [[ "$html" == *'network.publish'* && "$html" == *'Add value'* ]] && ok "WISE schema renders as GUI" || not_ok "WISE schema renders as GUI"
 
+showcase="$ROOT_DIR/docs/generated/integration-preview/wise-env.md"
+showcase_html="$ROOT_DIR/docs/generated/integration-preview/wise-env.gui.html"
+[[ -f "$showcase_html" && "$(<"$showcase")" == *'<iframe'* && "$(<"$showcase")" == *'src="../wise-env.gui.html"'* ]] && ok "WISE GUI showcase is published" || not_ok "WISE GUI showcase is published"
+
 printf '1..%d\n' "$tests"
 (( failures == 0 ))

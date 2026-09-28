@@ -26,7 +26,7 @@ nav:
       - Installation and GUI: installation-and-gui.md
       - Distributing a script: distributing-a-script.md
   - GUI advisor: gui-design.md
-  - Generated examples:
+  - Interactive GUI examples:
       - UniOpt demo: generated/uniopt-demo.md
       - WISE environment: generated/integration-preview/wise-env.md
       - WISE up: generated/integration-preview/wise-up.md

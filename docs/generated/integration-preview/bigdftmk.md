@@ -1,23 +1,22 @@
-# `bigdftmk`
+# `bigdftmk` GUI preview
 
-Build a BigDFT SDK container command
+This interactive command-line advisor is generated from the same UniOpt schema
+used by the preview command. Change fields to see the exact command update
+immediately. Basic and advanced options, repeatable values, paths, choices,
+tri-state values, positionals, and constraints are presented from schema
+metadata.
 
-## Options
+<iframe
+  src="../bigdftmk.gui.html"
+  title="bigdftmk UniOpt GUI preview"
+  style="width: 100%; height: 52rem; border: 1px solid #aeb8c2; border-radius: .4rem; background: white;"
+></iframe>
 
-| Option | Type | Default | Description |
-|---|---|---|---|
-| `-h, --help` | `boolean` | `false` | Show help and exit |
-| `--gui` | `boolean` | `false` | Open the graphical command-line advisor |
-| `-X, --display` | `boolean` | `false` | Enable host display usage |
-| `-w, --workdir` | `boolean` | `false` | Mount the present directory |
-| `-k, --keep` | `boolean` | `false` | Keep the container after it exits |
-| `-r, --root` | `boolean` | `false` | Run as root |
-| `-x, --extra-cmd ARG` | `string` | `` | Additional docker run argument |
-| `-e, --extra-positional ARG` | `string` | `` | Additional command argument |
-| `-d, --homedir PATH` | `path` | `/tmp/fake_home` | Container home directory |
-| `-g, --gpus` | `boolean` | `false` | Enable NVIDIA GPU access |
-| `-s, --sources PATH` | `path` | `dynamic: preview_bigdft_sources` | BigDFT source directory |
-| `-i, --image IMAGE` | `string` | `bigdft/sdk:latest` | SDK container image |
-| `-b, --binaries PATH` | `path` | `dynamic: preview_bigdft_binaries` | Binaries directory |
-| `-t, --target PATH` | `path` | `/opt/bigdft` | Target binaries directory |
-| `-p, --port PORT` | `uint` | `` | Host port mapped to container port 8888 |
+[Open the bigdftmk advisor in a full browser page](bigdftmk.gui.html)
+
+!!! note "Static demonstration"
+
+    This hosted advisor builds a command line but does not execute it or browse
+    the server filesystem. Install UniOpt and run
+    `examples/integration-preview/bin/bigdftmk --gui` for the complete local
+    advisor with **Run** and path browsing.

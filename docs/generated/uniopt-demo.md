@@ -1,26 +1,21 @@
-# `uniopt-demo`
+# `uniopt-demo` GUI preview
 
-Build a greeting while demonstrating UniOpt's schema-driven interfaces.
+This interactive command-line advisor is generated from the demo's UniOpt
+schema. Change fields to see the exact command update immediately. It shows how
+one declaration supplies GUI controls for choices, numbers, repeatable values,
+paths, booleans, positionals, and remainder arguments.
 
-## Options
+<iframe
+  src="../uniopt-demo.gui.html"
+  title="UniOpt demo GUI preview"
+  style="width: 100%; height: 52rem; border: 1px solid #aeb8c2; border-radius: .4rem; background: white;"
+></iframe>
 
-| Option | Type | Default | Description |
-|---|---|---|---|
-| `-h, --help` | `boolean` | `false` | Show help and exit |
-| `--gui` | `boolean` | `false` | Open the graphical command-line advisor |
-| `-n, --name NAME` | `string` | `dynamic: uniopt_demo_default_name` | Name of the sender |
-| `-s, --style STYLE` | `enum` | `friendly` | Greeting style |
-| `-o, --output PATH` | `path` | `-` | Write to PATH instead of standard output |
-| `--loud` | `boolean` | `false` | Use uppercase output |
-| `--color, --no-color` | `tristate` | `inherit` | Enable, disable, or inherit terminal color |
-| `-j, --jobs N` | `uint` | `1` | Positive worker count |
-| `-t, --tag TAG` | `string` | `` | Attach a tag; may be repeated |
-| `--show-sources` | `boolean` | `false` | Print selected value provenance |
-| `--quick` | `action` | `` | Alias for terse, uppercase output |
+[Open the demo advisor in a full browser page](uniopt-demo.gui.html)
 
-## Arguments
+!!! note "Static demonstration"
 
-| Argument | Type | Required | Description |
-|---|---|---|---|
-| `RECIPIENT` | `string` | yes | Person or group to greet |
-| `WORD...` | `string` | no | Extra words preserved after -- |
+    This hosted advisor builds a command line but does not execute it or browse
+    the server filesystem. Install UniOpt and run
+    `./examples/uniopt-demo/uniopt-demo --gui` for the complete local advisor
+    with **Run** and path browsing.

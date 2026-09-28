@@ -12,7 +12,31 @@ TEMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/uniopt-integration-docs.XXXXXX")"
 trap 'rm -rf "$TEMP_DIR"' EXIT
 
 for command in "${COMMANDS[@]}"; do
-  "$RENDER" markdown "$command" >"$TEMP_DIR/$command.md"
+  cat >"$TEMP_DIR/$command.md" <<EOF
+# \`$command\` GUI preview
+
+This interactive command-line advisor is generated from the same UniOpt schema
+used by the preview command. Change fields to see the exact command update
+immediately. Basic and advanced options, repeatable values, paths, choices,
+tri-state values, positionals, and constraints are presented from schema
+metadata.
+
+<iframe
+  src="../$command.gui.html"
+  title="$command UniOpt GUI preview"
+  style="width: 100%; height: 52rem; border: 1px solid #aeb8c2; border-radius: .4rem; background: white;"
+></iframe>
+
+[Open the $command advisor in a full browser page]($command.gui.html)
+
+!!! note "Static demonstration"
+
+    This hosted advisor builds a command line but does not execute it or browse
+    the server filesystem. Install UniOpt and run
+    \`examples/integration-preview/bin/$command --gui\` for the complete local
+    advisor with **Run** and path browsing.
+EOF
+  "$RENDER" gui "$command" >"$TEMP_DIR/$command.gui.html"
   "$RENDER" json "$command" >"$TEMP_DIR/$command.schema.json"
   "$RENDER" completion "$command" >"$TEMP_DIR/$command.bash"
 done
@@ -20,6 +44,7 @@ done
 if (( CHECK )); then
   for command in "${COMMANDS[@]}"; do
     diff -u "$OUTPUT_DIR/$command.md" "$TEMP_DIR/$command.md"
+    diff -u "$OUTPUT_DIR/$command.gui.html" "$TEMP_DIR/$command.gui.html"
     diff -u "$OUTPUT_DIR/$command.schema.json" "$TEMP_DIR/$command.schema.json"
     diff -u "$OUTPUT_DIR/$command.bash" "$TEMP_DIR/$command.bash"
   done
@@ -27,6 +52,7 @@ else
   mkdir -p "$OUTPUT_DIR"
   for command in "${COMMANDS[@]}"; do
     cp "$TEMP_DIR/$command.md" "$OUTPUT_DIR/$command.md"
+    cp "$TEMP_DIR/$command.gui.html" "$OUTPUT_DIR/$command.gui.html"
     cp "$TEMP_DIR/$command.schema.json" "$OUTPUT_DIR/$command.schema.json"
     cp "$TEMP_DIR/$command.bash" "$OUTPUT_DIR/$command.bash"
   done

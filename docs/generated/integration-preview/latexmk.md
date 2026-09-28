@@ -1,22 +1,22 @@
-# `latexmk`
+# `latexmk` GUI preview
 
-Build a LaTeX container command
+This interactive command-line advisor is generated from the same UniOpt schema
+used by the preview command. Change fields to see the exact command update
+immediately. Basic and advanced options, repeatable values, paths, choices,
+tri-state values, positionals, and constraints are presented from schema
+metadata.
 
-## Options
+<iframe
+  src="../latexmk.gui.html"
+  title="latexmk UniOpt GUI preview"
+  style="width: 100%; height: 52rem; border: 1px solid #aeb8c2; border-radius: .4rem; background: white;"
+></iframe>
 
-| Option | Type | Default | Description |
-|---|---|---|---|
-| `-h, --help` | `boolean` | `false` | Show help and exit |
-| `--gui` | `boolean` | `false` | Open the graphical command-line advisor |
-| `-X, --display` | `boolean` | `false` | Enable host display usage |
-| `-w, --workdir` | `boolean` | `false` | Mount the present directory |
-| `-k, --keep` | `boolean` | `false` | Keep the container after it exits |
-| `-r, --root` | `boolean` | `false` | Run as root |
-| `-x, --extra-cmd ARG` | `string` | `` | Additional docker run argument |
-| `-e, --extra-positional ARG` | `string` | `` | Additional command argument |
-| `-d, --homedir PATH` | `path` | `/tmp/fake_home` | Container home directory |
-| `-g, --gpus` | `boolean` | `false` | Enable NVIDIA GPU access |
-| `-s, --sources PATH` | `path` | `` | Source LaTeX file |
-| `--extradir PATH` | `path` | `` | Additional mounted directory; legacy -x is shadowed by --extra-cmd |
-| `-o, --outputdir PATH` | `path` | `/tmp` | Output directory relative to the source |
-| `-i, --image IMAGE` | `string` | `bigdft/latex` | LaTeX container image |
+[Open the latexmk advisor in a full browser page](latexmk.gui.html)
+
+!!! note "Static demonstration"
+
+    This hosted advisor builds a command line but does not execute it or browse
+    the server filesystem. Install UniOpt and run
+    `examples/integration-preview/bin/latexmk --gui` for the complete local
+    advisor with **Run** and path browsing.

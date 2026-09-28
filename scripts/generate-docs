@@ -13,20 +13,45 @@ TEMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/uniopt-docs.XXXXXX")"
 trap 'rm -rf "$TEMP_DIR"' EXIT
 
 "$ROOT_DIR/bin/uniopt" help "$SCHEMA" "$FUNCTION" >"$TEMP_DIR/uniopt-demo.help.txt"
-"$ROOT_DIR/bin/uniopt" markdown "$SCHEMA" "$FUNCTION" >"$TEMP_DIR/uniopt-demo.md"
 "$ROOT_DIR/bin/uniopt" json "$SCHEMA" "$FUNCTION" >"$TEMP_DIR/uniopt-demo.schema.json"
 "$ROOT_DIR/bin/uniopt" completion "$SCHEMA" "$FUNCTION" >"$TEMP_DIR/uniopt-demo.bash"
+python3 "$ROOT_DIR/tools/uniopt-json-to-html" "$TEMP_DIR/uniopt-demo.schema.json" >"$TEMP_DIR/uniopt-demo.gui.html"
+cat >"$TEMP_DIR/uniopt-demo.md" <<'EOF'
+# `uniopt-demo` GUI preview
+
+This interactive command-line advisor is generated from the demo's UniOpt
+schema. Change fields to see the exact command update immediately. It shows how
+one declaration supplies GUI controls for choices, numbers, repeatable values,
+paths, booleans, positionals, and remainder arguments.
+
+<iframe
+  src="../uniopt-demo.gui.html"
+  title="UniOpt demo GUI preview"
+  style="width: 100%; height: 52rem; border: 1px solid #aeb8c2; border-radius: .4rem; background: white;"
+></iframe>
+
+[Open the demo advisor in a full browser page](uniopt-demo.gui.html)
+
+!!! note "Static demonstration"
+
+    This hosted advisor builds a command line but does not execute it or browse
+    the server filesystem. Install UniOpt and run
+    `./examples/uniopt-demo/uniopt-demo --gui` for the complete local advisor
+    with **Run** and path browsing.
+EOF
 
 if (( CHECK )); then
   diff -u "$OUTPUT_DIR/uniopt-demo.help.txt" "$TEMP_DIR/uniopt-demo.help.txt"
   diff -u "$OUTPUT_DIR/uniopt-demo.md" "$TEMP_DIR/uniopt-demo.md"
   diff -u "$OUTPUT_DIR/uniopt-demo.schema.json" "$TEMP_DIR/uniopt-demo.schema.json"
+  diff -u "$OUTPUT_DIR/uniopt-demo.gui.html" "$TEMP_DIR/uniopt-demo.gui.html"
   diff -u "$COMPLETION" "$TEMP_DIR/uniopt-demo.bash"
 else
   mkdir -p "$OUTPUT_DIR" "$(dirname "$COMPLETION")"
   cp "$TEMP_DIR/uniopt-demo.help.txt" "$OUTPUT_DIR/uniopt-demo.help.txt"
   cp "$TEMP_DIR/uniopt-demo.md" "$OUTPUT_DIR/uniopt-demo.md"
   cp "$TEMP_DIR/uniopt-demo.schema.json" "$OUTPUT_DIR/uniopt-demo.schema.json"
+  cp "$TEMP_DIR/uniopt-demo.gui.html" "$OUTPUT_DIR/uniopt-demo.gui.html"
   cp "$TEMP_DIR/uniopt-demo.bash" "$COMPLETION"
 fi
 
