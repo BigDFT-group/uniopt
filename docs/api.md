@@ -148,9 +148,10 @@ running validators:
   including enum value completion after the corresponding option.
 
 JSON uses `schema_version: 1`, exposes semantic IDs and CLI spellings separately,
-and describes aliases through their `sets` object. Dynamic and environment
-defaults are exported by source name and their literal value is `null`, so
-introspection cannot cause their side effects.
+and describes aliases through their ordered `sets` array. Language bindings
+retain Bash destinations, validators, and dynamic-default function names.
+Dynamic and environment defaults are exported by source name and their literal
+value is `null`, so introspection cannot cause their side effects.
 
 ## ContainerXP compatibility path
 

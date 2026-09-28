@@ -16,10 +16,12 @@ jobs:
           cache-dependency-path: requirements-docs.txt
       - run: python -m pip install -r requirements-docs.txt
       - run: ./scripts/check-docs
+      - run: python scripts/validate-json-schema.py
       - run: mkdocs build --strict
       - run: cp llms.txt llms-full.txt site/
+      - run: mkdir -p site/schema && cp schema/uniopt.schema.json site/schema/
       - name: Assert agent files are at the Pages root
-        run: test -s site/llms.txt && test -s site/llms-full.txt
+        run: test -s site/llms.txt && test -s site/llms-full.txt && test -s site/schema/uniopt.schema.json
 
   current-bash:
     runs-on: ubuntu-latest

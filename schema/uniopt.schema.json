@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bigdft-group.github.io/uniopt/schema/uniopt.schema.json",
+  "title": "UniOpt command-line schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "command",
+    "summary",
+    "unknown_policy",
+    "bindings",
+    "ui",
+    "items",
+    "constraints"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "command": {"type": "string"},
+    "summary": {"type": "string"},
+    "unknown_policy": {"enum": ["error", "collect", "stop"]},
+    "bindings": {
+      "type": "object",
+      "required": ["bash"],
+      "propertyNames": {"pattern": "^[a-z][a-z0-9_-]*$"},
+      "additionalProperties": {"$ref": "#/$defs/schemaBinding"},
+      "properties": {"bash": {"$ref": "#/$defs/schemaBinding"}}
+    },
+    "ui": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["confirm"],
+      "properties": {"confirm": {"type": "string"}}
+    },
+    "items": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/item"}
+    },
+    "constraints": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/constraint"}
+    }
+  },
+  "$defs": {
+    "nullableString": {"type": ["string", "null"]},
+    "schemaBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "unknown_destination": {"$ref": "#/$defs/nullableString"}
+      }
+    },
+    "itemBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "destination": {"$ref": "#/$defs/nullableString"},
+        "default_function": {"$ref": "#/$defs/nullableString"},
+        "validator": {"$ref": "#/$defs/nullableString"}
+      }
+    },
+    "ui": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "group", "control", "placeholder", "advanced", "order", "min", "max", "step", "file_mode"],
+      "properties": {
+        "label": {"type": "string"},
+        "group": {"type": "string"},
+        "control": {"enum": ["auto", "text", "textarea", "password", "number", "select", "radio", "checkbox", "tristate", "file", "directory", "list", "hidden"]},
+        "placeholder": {"type": "string"},
+        "advanced": {"type": "boolean"},
+        "order": {"type": ["integer", "null"]},
+        "min": {"$ref": "#/$defs/nullableString"},
+        "max": {"$ref": "#/$defs/nullableString"},
+        "step": {"$ref": "#/$defs/nullableString"},
+        "file_mode": {"enum": ["auto", "open", "save", "directory"]}
+      }
+    },
+    "assignment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "value"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]*$"},
+        "value": {"type": "string"}
+      }
+    },
+    "item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "type", "destination", "bindings", "short", "long", "negative_long", "metavar", "help", "required", "repeatable", "internal", "default", "dynamic_default", "environment_default", "store_constant", "ui", "choices", "sets"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]*$"},
+        "kind": {"enum": ["option", "alias", "positional", "remainder"]},
+        "type": {"enum": ["string", "path", "int", "integer", "uint", "enum", "boolean", "tristate"]},
+        "destination": {"type": "string"},
+        "bindings": {
+          "type": "object",
+          "required": ["bash"],
+          "propertyNames": {"pattern": "^[a-z][a-z0-9_-]*$"},
+          "additionalProperties": {"$ref": "#/$defs/itemBinding"},
+          "properties": {"bash": {"$ref": "#/$defs/itemBinding"}}
+        },
+        "short": {"type": "string"},
+        "long": {"type": "string"},
+        "negative_long": {"type": "string"},
+        "metavar": {"type": "string"},
+        "help": {"type": "string"},
+        "required": {"type": "boolean"},
+        "repeatable": {"type": "boolean"},
+        "internal": {"type": "boolean"},
+        "default": {"$ref": "#/$defs/nullableString"},
+        "dynamic_default": {"$ref": "#/$defs/nullableString"},
+        "environment_default": {"$ref": "#/$defs/nullableString"},
+        "store_constant": {"$ref": "#/$defs/nullableString"},
+        "ui": {"$ref": "#/$defs/ui"},
+        "choices": {"type": "array", "items": {"type": "string"}},
+        "sets": {"type": "array", "items": {"$ref": "#/$defs/assignment"}}
+      }
+    },
+    "constraint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "members"],
+      "properties": {
+        "kind": {"enum": ["mutex", "requires", "conflicts", "one-of", "one_of"]},
+        "members": {
+          "type": "array",
+          "minItems": 2,
+          "items": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]*$"}
+        }
+      }
+    }
+  }
+}

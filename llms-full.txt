@@ -58,6 +58,17 @@ in a file containing several schemas:
 ./bin/uniopt help examples/wise-schemas.sh wise_schema_shell
 ```
 
+Round-trip a declaration through normalized JSON and generate a standalone
+Bash registration function:
+
+```bash
+./bin/uniopt json examples/uniopt-demo/schema.sh uniopt_demo_schema >demo.schema.json
+./bin/uniopt json-to-bash demo.schema.json generated_demo_schema >demo-schema.sh
+```
+
+The [round-trip guide](docs/schema-round-trip.md) documents language bindings,
+callback handling, exact quoting, and the formal JSON format.
+
 This repository is a standalone design. WISE and ContainerXP are inputs to its
 behavior requirements; neither project is modified by this prototype.
 
@@ -193,6 +204,18 @@ uniopt markdown mytool-schema.sh mytool_schema
 uniopt json mytool-schema.sh mytool_schema
 uniopt completion mytool-schema.sh mytool_schema
 ```
+
+The JSON representation can also regenerate an equivalent dependency-free Bash
+schema:
+
+```bash
+uniopt json mytool-schema.sh mytool_schema >mytool.schema.json
+uniopt json-to-bash mytool.schema.json generated_mytool_schema \
+  >mytool-schema.generated.sh
+```
+
+See [Bash and JSON schema round trip](schema-round-trip.md) for callback
+bindings and the normalized-format guarantee.
 
 ## Defaults and provenance
 
@@ -548,8 +571,15 @@ Writes a deterministic Markdown option table to standard output.
 
 Writes a deterministic JSON object with `schema_version: 1`, command metadata,
 items, spellings, types, defaults, choices, alias assignments, stable semantic
-IDs, constraints, and optional presentation metadata in each item's `ui`
-object. Dynamic and environment default values remain unresolved.
+IDs, constraints, language bindings, and optional presentation metadata in
+each item's `ui` object. Dynamic and environment default values remain
+unresolved. Bash bindings retain scalar destinations, the unknown-argument
+destination, dynamic-default function names, and validator function names.
+Alias assignments are ordered arrays so regeneration preserves duplicate
+target assignments.
+
+The normalized format is formally described by
+[`schema/uniopt.schema.json`](https://bigdft-group.github.io/uniopt/schema/uniopt.schema.json).
 
 ### `uniopt_completion [COMMAND [FUNCTION]]`
 
@@ -564,6 +594,7 @@ and path values for path-typed options.
 
 ```text
 uniopt {help|markdown|json|completion} SCHEMA_FILE [SCHEMA_FUNCTION]
+uniopt json-to-bash SCHEMA_JSON [SCHEMA_FUNCTION]
 uniopt validate SCHEMA_FILE SCHEMA_FUNCTION -- [ARG...]
 uniopt gui SCHEMA_FILE SCHEMA_FUNCTION -- PROGRAM [FIXED_ARG...]
 ```
@@ -574,14 +605,173 @@ the library in the repository layout, the installed `share/uniopt` layout, or
 the explicit `UNIOPT_LIB` path. Schema files supplied to this command are Bash
 code and must be trusted.
 
+`json-to-bash` validates normalized UniOpt JSON and writes a deterministic Bash
+registration function. It uses Python 3 only at generation time; the generated
+file needs only UniOpt and Bash 3.2. Callback names are retained as Bash
+bindings, while callback implementations remain application code. See the
+[round-trip guide](schema-round-trip.md) for the semantic guarantee and safety
+limits.
+
 `validate` runs defaults, parsing, types, custom validators, and constraints
 without application domain logic. `gui` fixes the executable before opening a
 Tk, Qt, or loopback web advisor, validates the constructed argv, then invokes
 that executable directly without a shell. Select a backend with
 `UNIOPT_GUI_BACKEND=auto|tk|qt|web`, a web port with `UNIOPT_GUI_PORT`, and
 automatic browser opening with `UNIOPT_GUI_OPEN=1`. `UNIOPT_PYTHON` selects the
-Python interpreter used for the optional advisor. The Bash parser and all
-non-GUI generators do not require Python.
+Python interpreter used for the optional advisor and JSON-to-Bash compiler.
+The Bash parser and shell-native help, Markdown, JSON, and completion renderers
+do not require Python.
+---
+
+<!-- Source: docs/schema-round-trip.md -->
+
+# Bash and JSON schema round trip
+
+UniOpt JSON is a normalized interchange representation of a registered command
+schema. The companion command can convert a trusted Bash declaration to JSON
+and compile that JSON back into Bash declarations:
+
+```bash
+./bin/uniopt json mytool-schema.sh mytool_schema >mytool.schema.json
+./bin/uniopt json-to-bash mytool.schema.json mytool_schema \
+  >mytool-schema.generated.sh
+```
+
+The generated file defines the requested registration function. Source the
+UniOpt library and that file, then call the function exactly as for a handwritten
+schema:
+
+```bash
+source /usr/local/share/uniopt/lib/uniopt.sh
+source ./mytool-schema.generated.sh
+mytool_schema
+uniopt_parse "$@" || exit 2
+```
+
+Conversion needs Python 3 and only its standard library. The generated schema
+has no Python or JSON parser dependency and remains compatible with Bash 3.2.
+
+## What round trip means
+
+The guarantee is semantic rather than textual:
+
+```text
+Bash declarations
+    -> normalized JSON A
+    -> generated Bash declarations
+    -> normalized JSON B
+
+JSON A == JSON B
+```
+
+Registration order, semantic IDs, spellings, defaults, types, choices,
+repeatability, positionals, aliases, constraints, presentation metadata, and
+Bash bindings are retained. The parser, help, Markdown, completion, and GUI
+continue to consume the same in-memory registry.
+
+The converter does not reconstruct comments, formatting, loops, conditionals,
+or helper-function bodies from the original Bash source. It captures the
+concrete schema registered during introspection.
+
+## Language bindings
+
+Portable CLI behavior is separate from language-specific names. Schema-level
+Bash bindings currently contain the unknown-argument destination:
+
+```json
+"bindings": {
+  "bash": {
+    "unknown_destination": "COMPOSE_ARGS"
+  }
+}
+```
+
+Each item carries its Bash result destination and callback names:
+
+```json
+"bindings": {
+  "bash": {
+    "destination": "JOBS",
+    "default_function": null,
+    "validator": "validate_positive_jobs"
+  }
+}
+```
+
+The `destination` and `dynamic_default` fields remain in the normalized JSON
+for compatibility with current consumers. The compiler requires them to agree
+with `bindings.bash`, preventing two conflicting interpretations.
+
+A future Python package can add a sibling binding:
+
+```json
+"bindings": {
+  "bash": {"destination": "JOBS", "validator": "validate_jobs"},
+  "python": {"destination": "jobs", "validator": "validate_jobs"}
+}
+```
+
+The present Bash exporter naturally emits the Bash projection. The
+JSON-to-Bash compiler selects `bindings.bash`; a later Python adapter will
+select `bindings.python`. Stable semantic IDs remain the portable interface.
+
+## Callbacks and application code
+
+JSON records callback names, not executable source. If generated declarations
+refer to a dynamic default or validator, the application must provide that
+function before parsing:
+
+```bash
+validate_positive_jobs() {
+  (( $1 > 0 ))
+}
+
+source ./mytool-schema.generated.sh
+mytool_schema
+uniopt_parse "$@"
+```
+
+This keeps executable code out of the data format. It also gives another
+language freedom to bind the same semantic operation to its own implementation.
+
+## Ordered aliases and reserved controls
+
+Alias assignments are arrays rather than JSON objects:
+
+```json
+"sets": [
+  {"id": "output.mode", "value": "brief"},
+  {"id": "output.color", "value": "false"}
+]
+```
+
+Arrays retain order and repeated assignments to the same target. The last
+assignment therefore has the same meaning after regeneration.
+
+The reserved `interface.help` and `interface.gui` entries remain visible in
+JSON for introspection. The compiler validates and skips their explicit
+generation because `uniopt_schema` registers them automatically.
+
+## Validation and safety
+
+The formal format is published as
+[`uniopt.schema.json`](https://bigdft-group.github.io/uniopt/schema/uniopt.schema.json).
+The compiler additionally checks duplicate object keys, supported schema
+versions, callback and function identifiers, binding consistency, item kinds,
+types, UI metadata, and unknown properties.
+
+All generated arguments use literal Bash quoting. Values are never evaluated
+or converted through whitespace-delimited strings. Empty strings, spaces,
+quotes, dollar signs, command-substitution text, wildcards, brackets,
+backslashes, Unicode, and embedded newlines remain data. NUL is rejected
+because Bash variables and Unix argument vectors cannot represent it.
+
+## Choosing the authoritative source
+
+A project should choose either the Bash declaration or JSON document as its
+editable source and generate the other artifact in CI. Editing both creates an
+avoidable merge and synchronization problem. UniOpt supports both directions;
+the choice belongs to the application.
 ---
 
 <!-- Source: docs/distributing-a-script.md -->
@@ -1342,6 +1532,7 @@ GNU Bash 3.2.57, and macOS `/bin/bash` after asserting that the latter is 3.2.
 | Exact argv integrity | `tests/run.sh`, `tests/extended.sh`, and `tests/integration-preview.sh` compare arrays element by element, including empty, whitespace, metacharacter, Unicode, newline, and post-`--` values |
 | Defaults and provenance | Literal, inherited, environment, callback, alias, positional, and explicit sources are asserted |
 | Generated interfaces | Determinism, JSON parsing, completion syntax/content, terminal help, Markdown, GUI metadata, static interactive showcases, and HTML conversion are tested |
+| Bash/JSON round trip | Every committed schema and an adversarial fixture pass Bash -> JSON -> generated Bash -> byte-identical normalized JSON; callback bindings, ordered aliases, safe quoting, duplicate-key errors, and NUL rejection are covered |
 | Side-effect-free introspection | Fixture markers prove that schema export exits before application logic and dynamic defaults run only during parsing |
 | Error behavior and shell modes | Status 2, option-specific diagnostics, nounset cleanliness, and representative `set -e` handling are asserted |
 | Filesystem and concurrency safety | Parallel parser processes run without shared parser files; static audit rejects `eval` and generated parser code |

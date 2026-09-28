@@ -22,5 +22,5 @@ install:
 
 uninstall:
 	rm -f "$(BINDIR)/uniopt" "$(DATADIR)/lib/uniopt.sh"
-	rm -rf "$(DATADIR)/docs" "$(DATADIR)/tools"
+	rm -rf "$(DATADIR)/docs" "$(DATADIR)/tools" "$(DATADIR)/schema"
 	rmdir "$(DATADIR)/lib" "$(DATADIR)" 2>/dev/null || true

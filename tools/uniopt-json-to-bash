@@ -1,0 +1,337 @@
+#!/usr/bin/env python3
+"""Compile a normalized UniOpt JSON schema into Bash registrations."""
+
+import argparse
+import json
+import re
+import sys
+
+
+IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+SEMANTIC_ID = re.compile(r"^[a-z][a-z0-9_.-]*$")
+KINDS = {"option", "alias", "positional", "remainder"}
+TYPES = {"string", "path", "int", "integer", "uint", "enum", "boolean", "tristate"}
+CONTROLS = {"auto", "text", "textarea", "password", "number", "select", "radio", "checkbox", "tristate", "file", "directory", "list", "hidden"}
+FILE_MODES = {"auto", "open", "save", "directory"}
+
+
+class SchemaError(ValueError):
+    pass
+
+
+def unique_object(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise SchemaError("duplicate JSON object key: %s" % key)
+        result[key] = value
+    return result
+
+
+def string(value, where, nullable=False):
+    if nullable and value is None:
+        return value
+    if not isinstance(value, str):
+        raise SchemaError("%s must be a string%s" % (where, " or null" if nullable else ""))
+    if "\0" in value:
+        raise SchemaError("%s contains NUL, which Bash variables cannot represent" % where)
+    return value
+
+
+def boolean(value, where):
+    if not isinstance(value, bool):
+        raise SchemaError("%s must be a boolean" % where)
+    return value
+
+
+def array(value, where):
+    if not isinstance(value, list):
+        raise SchemaError("%s must be an array" % where)
+    return value
+
+
+def object_value(value, where):
+    if not isinstance(value, dict):
+        raise SchemaError("%s must be an object" % where)
+    return value
+
+
+def required(obj, key, where):
+    if key not in obj:
+        raise SchemaError("%s is missing required property %s" % (where, key))
+    return obj[key]
+
+
+def only_keys(obj, allowed, where):
+    unknown = sorted(set(obj) - set(allowed))
+    if unknown:
+        raise SchemaError("%s has unknown properties: %s" % (where, ", ".join(unknown)))
+
+
+def shell_quote(value):
+    string(value, "Bash argument")
+    return "'" + value.replace("'", "'\"'\"'") + "'"
+
+
+def language_binding(container, language, where):
+    bindings = object_value(required(container, "bindings", where), where + ".bindings")
+    for name in bindings:
+        if not re.match(r"^[a-z][a-z0-9_-]*$", name):
+            raise SchemaError("%s.bindings has invalid language name: %s" % (where, name))
+    binding = object_value(required(bindings, language, where + ".bindings"), where + ".bindings." + language)
+    for key, value in binding.items():
+        string(value, "%s.bindings.%s.%s" % (where, language, key), nullable=True)
+    return binding
+
+
+def add_value(arguments, flag, value):
+    if value is not None and value != "":
+        arguments.extend((flag, value))
+
+
+def add_ui(arguments, item, kind, where):
+    ui = object_value(required(item, "ui", where), where + ".ui")
+    only_keys(ui, ("label", "group", "control", "placeholder", "advanced", "order", "min", "max", "step", "file_mode"), where + ".ui")
+    add_value(arguments, "--ui-label", string(required(ui, "label", where + ".ui"), where + ".ui.label"))
+    add_value(arguments, "--ui-group", string(required(ui, "group", where + ".ui"), where + ".ui.group"))
+    control = string(required(ui, "control", where + ".ui"), where + ".ui.control")
+    if control not in CONTROLS:
+        raise SchemaError("%s.ui.control is invalid: %s" % (where, control))
+    if control != "auto":
+        arguments.extend(("--ui-control", control))
+    add_value(arguments, "--ui-placeholder", string(required(ui, "placeholder", where + ".ui"), where + ".ui.placeholder"))
+    if boolean(required(ui, "advanced", where + ".ui"), where + ".ui.advanced"):
+        arguments.append("--ui-advanced")
+    order = required(ui, "order", where + ".ui")
+    if order is not None:
+        if isinstance(order, bool) or not isinstance(order, int):
+            raise SchemaError(where + ".ui.order must be an integer or null")
+        arguments.extend(("--ui-order", str(order)))
+    for key in ("min", "max", "step"):
+        value = string(required(ui, key, where + ".ui"), where + ".ui." + key, nullable=True)
+        if value is not None:
+            if kind != "option":
+                raise SchemaError("%s.ui.%s is only valid for options" % (where, key))
+            arguments.extend(("--ui-" + key, value))
+    file_mode = string(required(ui, "file_mode", where + ".ui"), where + ".ui.file_mode")
+    if file_mode not in FILE_MODES:
+        raise SchemaError("%s.ui.file_mode is invalid: %s" % (where, file_mode))
+    if file_mode != "auto":
+        if kind not in ("option", "positional", "remainder"):
+            raise SchemaError(where + ".ui.file_mode is not valid for aliases")
+        arguments.extend(("--ui-file-mode", file_mode))
+
+
+def emit_call(lines, function, arguments):
+    lines.append("  " + function + " " + " ".join(shell_quote(value) for value in arguments) + " || return")
+
+
+def validate_builtin(item, where):
+    item_id = item["id"]
+    expected = {
+        "interface.help": ("-h", "--help", "UNIOPT_BUILTIN_HELP"),
+        "interface.gui": ("", "--gui", "UNIOPT_BUILTIN_GUI"),
+    }[item_id]
+    actual = (item["short"], item["long"], item["destination"])
+    if item["kind"] != "option" or item["type"] != "boolean" or actual != expected:
+        raise SchemaError(where + " does not match UniOpt's reserved built-in definition")
+
+
+def compile_schema(schema, function_name):
+    root = object_value(schema, "schema")
+    only_keys(root, ("schema_version", "command", "summary", "unknown_policy", "bindings", "ui", "items", "constraints"), "schema")
+    if required(root, "schema_version", "schema") != 1:
+        raise SchemaError("only schema_version 1 is supported")
+    command = string(required(root, "command", "schema"), "schema.command")
+    summary = string(required(root, "summary", "schema"), "schema.summary")
+    policy = string(required(root, "unknown_policy", "schema"), "schema.unknown_policy")
+    if policy not in ("error", "collect", "stop"):
+        raise SchemaError("schema.unknown_policy is invalid: %s" % policy)
+    top_binding = language_binding(root, "bash", "schema")
+    for language, binding in root["bindings"].items():
+        binding = object_value(binding, "schema.bindings." + language)
+        only_keys(binding, ("unknown_destination",), "schema.bindings." + language)
+    unknown_destination = string(top_binding.get("unknown_destination"), "schema.bindings.bash.unknown_destination", nullable=True)
+    if policy != "error" and not unknown_destination:
+        raise SchemaError("%s policy requires bindings.bash.unknown_destination" % policy)
+    ui = object_value(required(root, "ui", "schema"), "schema.ui")
+    only_keys(ui, ("confirm",), "schema.ui")
+    confirm = string(required(ui, "confirm", "schema.ui"), "schema.ui.confirm")
+    items = array(required(root, "items", "schema"), "schema.items")
+    constraints = array(required(root, "constraints", "schema"), "schema.constraints")
+
+    if not IDENTIFIER.match(function_name):
+        raise SchemaError("invalid Bash schema function name: %s" % function_name)
+
+    lines = [
+        "#!/usr/bin/env bash",
+        "# Generated by UniOpt from normalized schema JSON. Do not edit.",
+        "",
+        function_name + "() {",
+        "  uniopt_reset",
+    ]
+    schema_args = [command, "--summary", summary, "--unknown", policy]
+    if confirm:
+        schema_args.extend(("--ui-confirm", confirm))
+    if policy != "error":
+        schema_args.extend(("--unknown-dest", unknown_destination))
+    emit_call(lines, "uniopt_schema", schema_args)
+
+    seen_ids = set()
+    for index, raw_item in enumerate(items):
+        where = "schema.items[%d]" % index
+        item = object_value(raw_item, where)
+        only_keys(item, ("id", "kind", "type", "destination", "bindings", "short", "long", "negative_long", "metavar", "help", "required", "repeatable", "internal", "default", "dynamic_default", "environment_default", "store_constant", "ui", "choices", "sets"), where)
+        item_id = string(required(item, "id", where), where + ".id")
+        if not SEMANTIC_ID.match(item_id):
+            raise SchemaError("%s.id is invalid: %s" % (where, item_id))
+        if item_id in seen_ids:
+            raise SchemaError("duplicate semantic ID: %s" % item_id)
+        seen_ids.add(item_id)
+        kind = string(required(item, "kind", where), where + ".kind")
+        value_type = string(required(item, "type", where), where + ".type")
+        if kind not in KINDS:
+            raise SchemaError("%s.kind is invalid: %s" % (where, kind))
+        if value_type not in TYPES:
+            raise SchemaError("%s.type is invalid: %s" % (where, value_type))
+        destination = string(required(item, "destination", where), where + ".destination")
+        bash_binding = language_binding(item, "bash", where)
+        for language, binding in item["bindings"].items():
+            binding = object_value(binding, "%s.bindings.%s" % (where, language))
+            only_keys(binding, ("destination", "default_function", "validator"), "%s.bindings.%s" % (where, language))
+        bound_destination = string(bash_binding.get("destination"), where + ".bindings.bash.destination", nullable=True)
+        expected_destination = destination or None
+        if bound_destination != expected_destination:
+            raise SchemaError(where + " has inconsistent destination and bindings.bash.destination")
+        default_function = string(bash_binding.get("default_function"), where + ".bindings.bash.default_function", nullable=True)
+        validator = string(bash_binding.get("validator"), where + ".bindings.bash.validator", nullable=True)
+        dynamic_default = string(required(item, "dynamic_default", where), where + ".dynamic_default", nullable=True)
+        if dynamic_default != default_function:
+            raise SchemaError(where + " has inconsistent dynamic_default and bindings.bash.default_function")
+        for callback_name, label in ((default_function, "default function"), (validator, "validator")):
+            if callback_name is not None and not IDENTIFIER.match(callback_name):
+                raise SchemaError("%s has invalid Bash %s: %s" % (where, label, callback_name))
+        for key in ("short", "long", "negative_long", "metavar", "help"):
+            string(required(item, key, where), where + "." + key)
+        for key in ("required", "repeatable", "internal"):
+            boolean(required(item, key, where), where + "." + key)
+        literal_default = string(required(item, "default", where), where + ".default", nullable=True)
+        environment_default = string(required(item, "environment_default", where), where + ".environment_default", nullable=True)
+        store_constant = string(required(item, "store_constant", where), where + ".store_constant", nullable=True)
+        choices = array(required(item, "choices", where), where + ".choices")
+        for choice_index, choice in enumerate(choices):
+            string(choice, "%s.choices[%d]" % (where, choice_index))
+        sets = array(required(item, "sets", where), where + ".sets")
+
+        if item_id in ("interface.help", "interface.gui"):
+            validate_builtin(item, where)
+            continue
+
+        if kind == "alias":
+            if (value_type != "string" or destination or bound_destination is not None or
+                    default_function is not None or validator is not None or
+                    literal_default is not None or environment_default is not None or
+                    store_constant is not None or choices or item["required"] or
+                    item["repeatable"] or item["internal"] or item["negative_long"] or
+                    item["metavar"]):
+                raise SchemaError(where + " contains fields that cannot be represented by uniopt_alias")
+            arguments = [item_id]
+            add_value(arguments, "--short", item["short"])
+            add_value(arguments, "--long", item["long"])
+            add_value(arguments, "--help", item["help"])
+            for set_index, assignment in enumerate(sets):
+                assignment_where = "%s.sets[%d]" % (where, set_index)
+                assignment = object_value(assignment, assignment_where)
+                only_keys(assignment, ("id", "value"), assignment_where)
+                target = string(required(assignment, "id", assignment_where), assignment_where + ".id")
+                value = string(required(assignment, "value", assignment_where), assignment_where + ".value")
+                arguments.extend(("--set", target, value))
+            add_ui(arguments, item, kind, where)
+            emit_call(lines, "uniopt_alias", arguments)
+            continue
+
+        if sets:
+            raise SchemaError(where + ".sets must be empty for non-alias items")
+        if kind == "option":
+            arguments = [item_id, "--dest", destination, "--type", value_type]
+            add_value(arguments, "--short", item["short"])
+            add_value(arguments, "--long", item["long"])
+            add_value(arguments, "--neg-long", item["negative_long"])
+            if literal_default is not None:
+                arguments.extend(("--default", literal_default))
+            if default_function is not None:
+                arguments.extend(("--default-fn", default_function))
+            if environment_default is not None:
+                arguments.extend(("--default-env", environment_default))
+            add_value(arguments, "--metavar", item["metavar"])
+            add_value(arguments, "--help", item["help"])
+            if item["repeatable"]:
+                arguments.append("--repeatable")
+            if item["required"]:
+                arguments.append("--required")
+            if item["internal"]:
+                arguments.append("--internal")
+            for choice in choices:
+                arguments.extend(("--choice", choice))
+            if validator is not None:
+                arguments.extend(("--validator", validator))
+            if store_constant is not None:
+                arguments.extend(("--store-const", store_constant))
+            add_ui(arguments, item, kind, where)
+            emit_call(lines, "uniopt_option", arguments)
+            continue
+
+        expected_repeatable = kind == "remainder"
+        if (item["short"] or item["long"] or item["negative_long"] or
+                literal_default is not None or default_function is not None or
+                environment_default is not None or store_constant is not None or
+                choices or item["internal"] or item["repeatable"] != expected_repeatable):
+            raise SchemaError(where + " contains fields that cannot be represented by uniopt_positional")
+        arguments = [item_id, "--dest", destination, "--type", value_type]
+        add_value(arguments, "--metavar", item["metavar"])
+        add_value(arguments, "--help", item["help"])
+        if item["required"]:
+            arguments.append("--required")
+        if kind == "remainder":
+            arguments.append("--remainder")
+        if validator is not None:
+            arguments.extend(("--validator", validator))
+        add_ui(arguments, item, kind, where)
+        emit_call(lines, "uniopt_positional", arguments)
+
+    for index, raw_constraint in enumerate(constraints):
+        where = "schema.constraints[%d]" % index
+        constraint = object_value(raw_constraint, where)
+        only_keys(constraint, ("kind", "members"), where)
+        kind = string(required(constraint, "kind", where), where + ".kind")
+        members = array(required(constraint, "members", where), where + ".members")
+        arguments = [kind]
+        for member_index, member in enumerate(members):
+            arguments.append(string(member, "%s.members[%d]" % (where, member_index)))
+        emit_call(lines, "uniopt_constraint", arguments)
+
+    lines.extend(("}", ""))
+    return "\n".join(lines)
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("schema", help="normalized JSON emitted by uniopt_json, or -")
+    parser.add_argument("function", nargs="?", help="generated Bash registration function")
+    args = parser.parse_args()
+    try:
+        if args.schema == "-":
+            schema = json.load(sys.stdin, object_pairs_hook=unique_object, parse_constant=lambda value: (_ for _ in ()).throw(SchemaError("invalid JSON constant: " + value)))
+        else:
+            with open(args.schema, encoding="utf-8") as stream:
+                schema = json.load(stream, object_pairs_hook=unique_object, parse_constant=lambda value: (_ for _ in ()).throw(SchemaError("invalid JSON constant: " + value)))
+        command = schema.get("command", "") if isinstance(schema, dict) else ""
+        function = args.function or ("uniopt_" + re.sub(r"[^A-Za-z0-9_]", "_", command) + "_schema")
+        sys.stdout.write(compile_schema(schema, function))
+    except (OSError, json.JSONDecodeError, SchemaError) as error:
+        parser.error(str(error))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

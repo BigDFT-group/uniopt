@@ -25,3 +25,4 @@ python3 "$ROOT_DIR/tests/documentation-links.py" || exit 1
 "$BASH" "$ROOT_DIR/tests/documentation.sh" || exit 1
 "$BASH" "$ROOT_DIR/tests/integration-preview.sh" || exit 1
 python3 "$ROOT_DIR/tests/gui-advisor.py" || exit 1
+python3 "$ROOT_DIR/tests/json-roundtrip.py" "$BASH" || exit 1

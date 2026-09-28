@@ -11,14 +11,16 @@ GitHub.
 2. Confirm public visibility for `BigDFT-group/uniopt`; the product name is
    UniOpt.
 3. Run `./scripts/generate-docs`, `./scripts/generate-llms`, the strict MkDocs
-   build, and both supported shell suites.
+   build, and both supported shell suites. Confirm that every committed schema
+   passes the Bash -> JSON -> Bash round-trip checks.
 4. Review `docs/integration-reference-audit.md`; the reference applications
    remain unchanged and several inspected scripts were uncommitted upstream.
 5. Create the initial commit on `main`.
 6. Create the dedicated remote repository with the chosen visibility, add it as
    `origin`, and push `main`.
 7. Enable GitHub Pages with GitHub Actions as its build source and confirm the
-   site exposes `/llms.txt` and `/llms-full.txt`.
+   site exposes `/llms.txt`, `/llms-full.txt`, and
+   `/schema/uniopt.schema.json`.
 8. Confirm the Bash, macOS, and documentation jobs pass before creating a
    version tag or release.
 

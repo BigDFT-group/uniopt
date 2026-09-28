@@ -246,8 +246,15 @@ Writes a deterministic Markdown option table to standard output.
 
 Writes a deterministic JSON object with `schema_version: 1`, command metadata,
 items, spellings, types, defaults, choices, alias assignments, stable semantic
-IDs, constraints, and optional presentation metadata in each item's `ui`
-object. Dynamic and environment default values remain unresolved.
+IDs, constraints, language bindings, and optional presentation metadata in
+each item's `ui` object. Dynamic and environment default values remain
+unresolved. Bash bindings retain scalar destinations, the unknown-argument
+destination, dynamic-default function names, and validator function names.
+Alias assignments are ordered arrays so regeneration preserves duplicate
+target assignments.
+
+The normalized format is formally described by
+[`schema/uniopt.schema.json`](https://bigdft-group.github.io/uniopt/schema/uniopt.schema.json).
 
 ### `uniopt_completion [COMMAND [FUNCTION]]`
 
@@ -262,6 +269,7 @@ and path values for path-typed options.
 
 ```text
 uniopt {help|markdown|json|completion} SCHEMA_FILE [SCHEMA_FUNCTION]
+uniopt json-to-bash SCHEMA_JSON [SCHEMA_FUNCTION]
 uniopt validate SCHEMA_FILE SCHEMA_FUNCTION -- [ARG...]
 uniopt gui SCHEMA_FILE SCHEMA_FUNCTION -- PROGRAM [FIXED_ARG...]
 ```
@@ -272,11 +280,19 @@ the library in the repository layout, the installed `share/uniopt` layout, or
 the explicit `UNIOPT_LIB` path. Schema files supplied to this command are Bash
 code and must be trusted.
 
+`json-to-bash` validates normalized UniOpt JSON and writes a deterministic Bash
+registration function. It uses Python 3 only at generation time; the generated
+file needs only UniOpt and Bash 3.2. Callback names are retained as Bash
+bindings, while callback implementations remain application code. See the
+[round-trip guide](schema-round-trip.md) for the semantic guarantee and safety
+limits.
+
 `validate` runs defaults, parsing, types, custom validators, and constraints
 without application domain logic. `gui` fixes the executable before opening a
 Tk, Qt, or loopback web advisor, validates the constructed argv, then invokes
 that executable directly without a shell. Select a backend with
 `UNIOPT_GUI_BACKEND=auto|tk|qt|web`, a web port with `UNIOPT_GUI_PORT`, and
 automatic browser opening with `UNIOPT_GUI_OPEN=1`. `UNIOPT_PYTHON` selects the
-Python interpreter used for the optional advisor. The Bash parser and all
-non-GUI generators do not require Python.
+Python interpreter used for the optional advisor and JSON-to-Bash compiler.
+The Bash parser and shell-native help, Markdown, JSON, and completion renderers
+do not require Python.

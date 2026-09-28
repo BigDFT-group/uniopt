@@ -14,6 +14,8 @@ LLMS = """# UniOpt
 
 Use `lib/uniopt.sh` from Bash. Schema registration and introspection are side-effect-free. The parser does not use `eval`, generated parser files, or whitespace serialization. Semantic option IDs are stable and separate from CLI spellings.
 
+Normalized schemas support a semantic Bash -> JSON -> generated Bash -> JSON round trip. Language bindings retain Bash destinations and callback names while callback implementations remain application code.
+
 ## Public API
 
 - [`uniopt_reset`](https://bigdft-group.github.io/uniopt/api-reference/#uniopt_reset): clear the active schema and result state; no arguments.
@@ -47,6 +49,7 @@ Compatibility names `uniopt_value`, `uniopt_provenance`, and `uniopt_values` del
 
 - [User guide](https://bigdft-group.github.io/uniopt/user-guide/): adoption tutorial and examples.
 - [Public API reference](https://bigdft-group.github.io/uniopt/api-reference/): complete function signatures and every declaration attribute.
+- [Bash and JSON schema round trip](https://bigdft-group.github.io/uniopt/schema-round-trip/): normalized JSON, language bindings, callbacks, safe Bash generation, and the formal schema.
 - [Installation and GUI](https://bigdft-group.github.io/uniopt/installation-and-gui/): packaging, frontend selection, and path controls.
 - [GUI advisor design](https://bigdft-group.github.io/uniopt/gui-design/): argv model, validation, execution, and security boundaries.
 - [Bash 3.2 compatibility](https://bigdft-group.github.io/uniopt/bash-3.2-compatibility/): supported language baseline and result API.
@@ -63,6 +66,7 @@ FULL_DOCUMENTS = (
     "README.md",
     "docs/user-guide.md",
     "docs/api-reference.md",
+    "docs/schema-round-trip.md",
     "docs/distributing-a-script.md",
     "docs/installation-and-gui.md",
     "docs/gui-design.md",

@@ -14,6 +14,7 @@ files=(
   "$ROOT_DIR/scripts/generate-docs"
   "$ROOT_DIR/scripts/check-docs"
   "$ROOT_DIR/scripts/install-uniopt"
+  "$ROOT_DIR/tests/fixtures/roundtrip-schema.sh"
 )
 for file in "$ROOT_DIR"/examples/integration-preview/bin/*; do files[${#files[@]}]="$file"; done
 status=0

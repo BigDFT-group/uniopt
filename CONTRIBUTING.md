@@ -18,6 +18,11 @@ match their schemas and that every public declaration attribute is documented.
 CI repeats the complete suite with current Bash, pinned GNU Bash 3.2.57, and
 macOS system Bash 3.2.
 
+Changes to the JSON representation or compiler must update
+`schema/uniopt.schema.json` and retain the semantic round trip checked by
+`tests/json-roundtrip.py`. The documentation environment runs
+`scripts/validate-json-schema.py` against every committed schema instance.
+
 Changes to the public API should update `docs/api-reference.md`, the user guide,
 tests for current and minimum Bash, and compatibility notes when behavior or a
 getter contract changes.

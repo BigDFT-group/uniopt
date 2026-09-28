@@ -15,6 +15,8 @@ Choose the page matching your task:
   evaluate a larger migration without application side effects.
 - [Public API reference](api-reference.md): complete function and declaration
   contract.
+- [Bash and JSON schema round trip](schema-round-trip.md): normalized format,
+  language bindings, callbacks, safe code generation, and limitations.
 - [Distributing a command](distributing-a-script.md): install a program and its
   completion definition.
 - [Installation and GUI integration](installation-and-gui.md): install UniOpt

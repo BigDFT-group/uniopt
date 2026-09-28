@@ -118,6 +118,18 @@ uniopt json mytool-schema.sh mytool_schema
 uniopt completion mytool-schema.sh mytool_schema
 ```
 
+The JSON representation can also regenerate an equivalent dependency-free Bash
+schema:
+
+```bash
+uniopt json mytool-schema.sh mytool_schema >mytool.schema.json
+uniopt json-to-bash mytool.schema.json generated_mytool_schema \
+  >mytool-schema.generated.sh
+```
+
+See [Bash and JSON schema round trip](schema-round-trip.md) for callback
+bindings and the normalized-format guarantee.
+
 ## Defaults and provenance
 
 Choose one default source for a scalar option:

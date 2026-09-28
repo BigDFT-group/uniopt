@@ -52,6 +52,17 @@ in a file containing several schemas:
 ./bin/uniopt help examples/wise-schemas.sh wise_schema_shell
 ```
 
+Round-trip a declaration through normalized JSON and generate a standalone
+Bash registration function:
+
+```bash
+./bin/uniopt json examples/uniopt-demo/schema.sh uniopt_demo_schema >demo.schema.json
+./bin/uniopt json-to-bash demo.schema.json generated_demo_schema >demo-schema.sh
+```
+
+The [round-trip guide](docs/schema-round-trip.md) documents language bindings,
+callback handling, exact quoting, and the formal JSON format.
+
 This repository is a standalone design. WISE and ContainerXP are inputs to its
 behavior requirements; neither project is modified by this prototype.
 

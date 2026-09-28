@@ -10,6 +10,8 @@ advisor while preserving exact argument boundaries.
 - Follow the [user guide](user-guide.md) to add UniOpt to a Bash program.
 - Consult the [public API reference](api-reference.md) for every function and
   declaration attribute.
+- Use the [Bash and JSON schema round trip](schema-round-trip.md) to export a
+  schema or generate dependency-free Bash registrations from normalized JSON.
 - Run the [demo](https://github.com/bigdft-group/uniopt/tree/main/examples/uniopt-demo)
   to exercise completion and the GUI advisor.
 - Explore the [interactive GUI examples](generated/uniopt-demo.md) to change

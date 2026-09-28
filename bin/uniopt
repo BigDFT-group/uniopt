@@ -20,6 +20,7 @@ usage() {
   cat >&2 <<'EOF'
 Usage:
   uniopt {help|markdown|json|completion} SCHEMA_FILE [SCHEMA_FUNCTION]
+  uniopt json-to-bash SCHEMA_JSON [SCHEMA_FUNCTION]
   uniopt validate SCHEMA_FILE SCHEMA_FUNCTION -- [ARG...]
   uniopt gui SCHEMA_FILE SCHEMA_FUNCTION -- PROGRAM [FIXED_ARG...]
 EOF
@@ -30,6 +31,24 @@ format="$1"
 schema_file="$2"
 shift 2
 schema_function=""
+
+if [[ "$format" == json-to-bash ]]; then
+  (( $# <= 1 )) || { usage; exit 2; }
+  [[ -r "$schema_file" ]] || { printf 'uniopt: cannot read schema: %s\n' "$schema_file" >&2; exit 2; }
+  if [[ -r "$ROOT_DIR/tools/uniopt-json-to-bash" ]]; then
+    json_compiler="$ROOT_DIR/tools/uniopt-json-to-bash"
+  elif [[ -r "$ROOT_DIR/share/uniopt/tools/uniopt-json-to-bash" ]]; then
+    json_compiler="$ROOT_DIR/share/uniopt/tools/uniopt-json-to-bash"
+  else
+    printf 'uniopt: cannot find the JSON-to-Bash compiler\n' >&2
+    exit 2
+  fi
+  if (( $# )); then
+    exec "${UNIOPT_PYTHON:-python3}" "$json_compiler" "$schema_file" "$1"
+  else
+    exec "${UNIOPT_PYTHON:-python3}" "$json_compiler" "$schema_file"
+  fi
+fi
 
 case "$format" in
   help|markdown|json|completion)

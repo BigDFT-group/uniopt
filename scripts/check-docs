@@ -6,6 +6,10 @@ REFERENCE="$ROOT_DIR/docs/api-reference.md"
 
 "$ROOT_DIR/scripts/generate-docs" --check
 "$ROOT_DIR/scripts/generate-llms" --check
+python3 -m json.tool "$ROOT_DIR/schema/uniopt.schema.json" >/dev/null
+for schema_file in "$ROOT_DIR"/docs/generated/*.schema.json "$ROOT_DIR"/docs/generated/integration-preview/*.schema.json; do
+  python3 "$ROOT_DIR/tools/uniopt-json-to-bash" "$schema_file" checked_schema >/dev/null
+done
 
 while IFS= read -r function_name; do
   case "$function_name" in uniopt__*) continue ;; esac

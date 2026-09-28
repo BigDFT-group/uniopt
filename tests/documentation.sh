@@ -60,7 +60,11 @@ install_root="$(mktemp -d "${TMPDIR:-/tmp}/uniopt-install.XXXXXX")"
 PREFIX=/usr/local DESTDIR="$install_root" "$BASH" "$ROOT_DIR/scripts/install-uniopt" >/dev/null || failures=$((failures + 1))
 "$install_root/usr/local/bin/uniopt" json "$ROOT_DIR/examples/uniopt-demo/schema.sh" uniopt_demo_schema >/dev/null || failures=$((failures + 1))
 [[ -x "$install_root/usr/local/share/uniopt/tools/uniopt-gui" ]] || failures=$((failures + 1))
+[[ -x "$install_root/usr/local/share/uniopt/tools/uniopt-json-to-bash" ]] || failures=$((failures + 1))
 [[ -r "$install_root/usr/local/share/uniopt/tools/uniopt_gui.py" ]] || failures=$((failures + 1))
+[[ -r "$install_root/usr/local/share/uniopt/schema/uniopt.schema.json" ]] || failures=$((failures + 1))
+"$install_root/usr/local/bin/uniopt" json-to-bash "$ROOT_DIR/docs/generated/uniopt-demo.schema.json" installed_generated_schema >"$install_root/generated-schema.sh" || failures=$((failures + 1))
+"$BASH" -n "$install_root/generated-schema.sh" || failures=$((failures + 1))
 
 demo_install_root="$(mktemp -d "${TMPDIR:-/tmp}/uniopt-demo-install.XXXXXX")"
 PREFIX=/usr/local DESTDIR="$demo_install_root" "$BASH" "$ROOT_DIR/examples/uniopt-demo/install" >/dev/null || failures=$((failures + 1))

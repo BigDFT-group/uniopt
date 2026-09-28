@@ -22,6 +22,7 @@ nav:
   - Home: index.md
   - User guide: user-guide.md
   - Public API: api-reference.md
+  - Bash and JSON schemas: schema-round-trip.md
   - Install and distribute:
       - Installation and GUI: installation-and-gui.md
       - Distributing a script: distributing-a-script.md

@@ -12,6 +12,7 @@ GNU Bash 3.2.57, and macOS `/bin/bash` after asserting that the latter is 3.2.
 | Exact argv integrity | `tests/run.sh`, `tests/extended.sh`, and `tests/integration-preview.sh` compare arrays element by element, including empty, whitespace, metacharacter, Unicode, newline, and post-`--` values |
 | Defaults and provenance | Literal, inherited, environment, callback, alias, positional, and explicit sources are asserted |
 | Generated interfaces | Determinism, JSON parsing, completion syntax/content, terminal help, Markdown, GUI metadata, static interactive showcases, and HTML conversion are tested |
+| Bash/JSON round trip | Every committed schema and an adversarial fixture pass Bash -> JSON -> generated Bash -> byte-identical normalized JSON; callback bindings, ordered aliases, safe quoting, duplicate-key errors, and NUL rejection are covered |
 | Side-effect-free introspection | Fixture markers prove that schema export exits before application logic and dynamic defaults run only during parsing |
 | Error behavior and shell modes | Status 2, option-specific diagnostics, nounset cleanliness, and representative `set -e` handling are asserted |
 | Filesystem and concurrency safety | Parallel parser processes run without shared parser files; static audit rejects `eval` and generated parser code |
